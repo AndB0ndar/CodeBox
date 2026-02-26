@@ -4,6 +4,9 @@ import threading
 from io import BytesIO
 from datetime import datetime
 
+from docker.errors import APIError
+from requests.exceptions import Timeout
+
 from .core.config import config
 from .core.mongo import mongodb
 from .core.docker_client import get_docker_client
@@ -65,13 +68,18 @@ def run_task(task_id: str):
         print(f"Task {task_id} not found")
         return
 
+    code = task['code']
+    language = task['language']
+
+    cpu_limit = task.get('cpu_limit', 1.0)
+    memory_limit = task.get('memory_limit', '256m')
+    timeout = task.get('timeout', 30)
+
     mongodb.db.tasks.update_one(
         {"_id": task_id},
         {"$set": {"status": "running", "started_at": datetime.utcnow()}}
     )
 
-    code = task['code']
-    language = task['language']
 
     if language == 'python':
         image = 'python:3.10-slim'
@@ -90,10 +98,16 @@ def run_task(task_id: str):
         return
 
     container = None
-    logs_buffer = BytesIO()
-    stats_dict = {}
     stats_thread = None
+
     stop_event = threading.Event()
+    logs_buffer = BytesIO()
+
+    stats_dict = {}
+    exit_code = -1
+
+    timed_out = False
+    timeout_timer = None
 
     try:
         container = docker_client.containers.run(
@@ -104,26 +118,69 @@ def run_task(task_id: str):
             stdout=True,
             stderr=True,
             remove=False,
+
+            # Resources limit
+            cpu_quota=int(cpu_limit * 100000),
+            mem_limit=memory_limit,
+            mem_swappiness=0,
+            pids_limit=100,
+
+            # Secutity
+            read_only=True,
+            security_opt=["no-new-privileges:true"],
+            cap_drop=["ALL"],
+            cap_add=[],
+            network_disabled=True,
+            tmpfs={"/tmp": "rw,noexec,nosuid,size=64m"}
         )
 
-        stats_thread = threading.Thread(target=collect_stats, args=(container, stats_dict, stop_event))
+        stats_thread = threading.Thread(
+            target=collect_stats,
+            args=(container, stats_dict, stop_event)
+        )
         stats_thread.start()
+
+        def stop_container():
+            nonlocal timeout, timed_out
+            timed_out = True
+            try:
+                container.stop(timeout=5)
+                logs_buffer.write(
+                    f"Task timed out after {timeout} seconds".encode()
+                )
+            except Exception as e:
+                print(f"Error stopping container on timeout: {e}")
+
+        if timeout > 0:
+            timeout_timer = threading.Timer(timeout, stop_container)
+            timeout_timer.start()
 
         result = container.wait()
         exit_code = result['StatusCode']
 
-        logs = container.logs(stdout=True, stderr=True)
-        logs_buffer.write(logs)
-
     except Exception as e:
         exit_code = -1
         logs_buffer.write(f"Error running container: {str(e)}".encode())
+
     finally:
+        if timeout_timer:
+            timeout_timer.cancel()
+
+        stop_event.set()
         if stats_thread and stats_thread.is_alive():
-            stop_event.set()
             stats_thread.join(timeout=2)
+
         if container:
-            container.remove()
+            try:
+                logs = container.logs(stdout=True, stderr=True)
+                logs_buffer.write(logs)
+            except Exception as e:
+                logs_buffer.write(f"Failed to get logs: {str(e)}".encode())
+            finally:
+                try:
+                    container.remove(force=True)
+                except Exception as e:
+                    print(f"Error removing container: {e}")
 
     if stats_dict.get('count', 0) > 0:
         stats_dict['avg_cpu'] = stats_dict['cpu_sum'] / stats_dict['count']
@@ -149,13 +206,18 @@ def run_task(task_id: str):
         logs_object = None
         logs_size = 0
 
+    if timed_out:
+        status = "timeout"
+    else:
+        status = "completed" if exit_code == 0 else "failed"
+
     update_data = {
-        "status": "completed" if exit_code == 0 else "failed",
+        "status": status,
         "finished_at": datetime.utcnow(),
         "exit_code": exit_code,
         "logs_object": logs_object,
         "logs_size": logs_size,
-        "metrics": stats_dict if stats_dict else None,
+        "metrics": stats_dict,
     }
     mongodb.db.tasks.update_one({"_id": task_id}, {"$set": update_data})
     print(f"Task {task_id} finished with exit code {exit_code}")

@@ -1,6 +1,7 @@
 const taskId = window.location.pathname.split('/').pop();
 const statusSpan = document.getElementById('status');
 const languageSpan = document.getElementById('language');
+const limitsSpan = document.getElementById('limits');
 const codePre = document.getElementById('code');
 const logsPre = document.getElementById('logs');
 const exitCodeSpan = document.getElementById('exit_code');
@@ -13,10 +14,11 @@ function fetchTask() {
         .then(task => {
             statusSpan.textContent = task.status;
             languageSpan.textContent = task.language;
+            limitsSpan.textContent = `CPU: ${task.cpu_limit} ядер, Память: ${task.memory_limit}, Таймаут: ${task.timeout}с`;
             codePre.textContent = task.code;
             exitCodeSpan.textContent = task.exit_code !== null ? task.exit_code : '—';
 
-            if (task.status === 'completed' || task.status === 'failed') {
+            if (task.status === 'completed' || task.status === 'failed' || task.status === 'timeout') {
                 fetchLogs();
                 fetchMetrics();
             } else {

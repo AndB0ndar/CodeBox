@@ -5,9 +5,17 @@ from flask import current_app
 
 class BackendClient:
     @staticmethod
-    def create_task(code, language):
+    def create_task(
+        code, language, cpu_limit=1.0, memory_limit='256m', timeout=30
+    ):
         url = f"{current_app.config['BACKEND_URL']}/api/v1/tasks"
-        payload = {"code": code, "language": language}
+        payload = {
+            "code": code,
+            "language": language,
+            "cpu_limit": cpu_limit,
+            "memory_limit": memory_limit,
+            "timeout": timeout
+        }
         response = requests.post(url, json=payload)
         response.raise_for_status()
         return response.json()["task_id"]

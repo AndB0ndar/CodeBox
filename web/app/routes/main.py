@@ -21,7 +21,14 @@ def submit():
     language = request.form.get('language')
     if not code or not language:
         return "Missing code or language", 400
-    task_id = BackendClient.create_task(code, language)
+
+    cpu_limit = float(request.form.get('cpu_limit', 1.0))
+    memory_limit = request.form.get('memory_limit', '256m')
+    timeout = int(request.form.get('timeout', 30))
+
+    task_id = BackendClient.create_task(
+        code, language, cpu_limit, memory_limit, timeout
+    )
     return redirect(url_for('main.task_detail', task_id=task_id))
 
 
