@@ -2,7 +2,7 @@
 {% block title %}Отправить код{% endblock %}
 {% block content %}
 <h1>Запустить код в изолированном окружении</h1>
-<form action="{{ url_for('main.submit') }}" method="post">
+<form action="{{ url_for('site.submit') }}" method="post">
     <label for="language">Язык:</label>
     <select name="language" id="language">
         <option value="python">Python</option>

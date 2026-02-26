@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 
-from app.api.v1 import tasks
+from app.api import tasks
 from app.core.config import settings
 from app.core.redis_pubsub import pubsub_manager
 from app.core.database import connect_to_mongo, close_mongo_connection
@@ -27,10 +27,10 @@ app = FastAPI(
 )
 
 
-app.include_router(tasks.router, prefix="/api/v1", tags=["tasks"])
+app.include_router(tasks.router, prefix="/api", tags=["tasks"])
 
 
-@app.get("/")
+@app.get("/health")
 async def root():
-    return {"message": "Task Runner API"}
+    return {"status": "Ok!!1!"}
 

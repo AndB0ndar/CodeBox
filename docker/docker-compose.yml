@@ -1,0 +1,14 @@
+name: codebox
+
+include:
+  - docker-compose.infra.yml
+  - docker-compose.app.yml
+
+volumes:
+  mongo_data:
+  minio_data:
+
+networks:
+  codebox-net:
+    driver: bridge
+

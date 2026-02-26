@@ -9,7 +9,7 @@ class BackendClient:
     def create_task(
         code, language, cpu_limit=1.0, memory_limit='256m', timeout=30
     ):
-        url = f"{current_app.config['BACKEND_URL']}/api/v1/tasks"
+        url = f"{current_app.config['BACKEND_URL']}/api/tasks"
         payload = {
             "code": code,
             "language": language,
@@ -24,7 +24,7 @@ class BackendClient:
 
     @staticmethod
     def get_task(task_id):
-        url = f"{current_app.config['BACKEND_URL']}/api/v1/tasks/{task_id}"
+        url = f"{current_app.config['BACKEND_URL']}/api/tasks/{task_id}"
         response = requests.get(url)
         if response.status_code == 404:
             return None
@@ -34,7 +34,7 @@ class BackendClient:
 
     @staticmethod
     def get_task_log(task_id):
-        url = f"{current_app.config['BACKEND_URL']}/api/v1/tasks/{task_id}/logs"
+        url = f"{current_app.config['BACKEND_URL']}/api/tasks/{task_id}/logs"
         response = requests.get(url)
         if response.status_code == 404:
             return None
@@ -44,7 +44,7 @@ class BackendClient:
 
     @staticmethod
     def get_task_metrics(task_id):
-        url = f"{current_app.config['BACKEND_URL']}/api/v1/tasks/{task_id}/metrics"
+        url = f"{current_app.config['BACKEND_URL']}/api/tasks/{task_id}/metrics"
         response = requests.get(url)
         if response.status_code == 404:
             return None
@@ -53,7 +53,7 @@ class BackendClient:
 
     @staticmethod
     def get_task_stream(task_id):
-        url = f"{current_app.config['BACKEND_URL']}/api/v1/tasks/{task_id}/stream"
+        url = f"{current_app.config['BACKEND_URL']}/api/tasks/{task_id}/stream"
         def generate():
             try:
                 with requests.get(url, stream=True) as r:

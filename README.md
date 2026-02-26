@@ -119,7 +119,6 @@ The test suite mocks external services (MongoDB, Redis, Docker, MinIO) so no act
 ├── backend/           # FastAPI application
 ├── web/               # Flask web UI
 ├── worker/            # RQ worker that runs Docker containers
-├── shared/            # (optional) shared models
 ├── tests/             # Unit and integration tests
 ├── docker-compose.yml # Main compose file
 └── README.md
