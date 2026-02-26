@@ -1,3 +1,5 @@
+import json
+import asyncio
 import urllib.parse
 
 from typing import List, Optional
@@ -72,27 +74,52 @@ async def get_task_metrics(task_id: str):
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     metrics = task.get("metrics")
-    if not metrics:
+    if metrics is None:
         raise HTTPException(status_code=404, detail="Metrics not available")
     return metrics
 
 
 @router.get("/tasks/{task_id}/stream")
 async def stream_task_status(task_id: str):
+    task = await mongodb.db.tasks.find_one({"_id": task_id})
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
     async def event_generator():
+        status = task.get("status")
+        f_finished = status in ['completed', 'failed', 'timeout']
+        initial_data = {"task_id": task_id, "status": status}
+        if f_finished:
+            initial_data["exit_code"] = task.get("exit_code")
+        yield {"event": "status_update", "data": json.dumps(initial_data)}
+        if f_finished:
+            return
+
+
         channel = f"task:{task_id}"
         await pubsub_manager.subscribe(channel)
         try:
             while True:
-                message = await pubsub_manager.get_message()
-                if message and message['type'] == 'message':
+                try:
+                    message = await asyncio.wait_for(
+                        pubsub_manager.get_message(),
+                        timeout=1.0
+                    )
+                except asyncio.TimeoutError:
+                    continue
+
+                if message and message.get('type') == 'message':
+                    data = json.loads(message['data'])
                     yield {
                         "event": "status_update",
-                        "data": message['data']
+                        "data": json.dumps(data)
                     }
-                await asyncio.sleep(0.1)
+                    if data.get('status') in ['completed', 'failed', 'timeout']:
+                        break
+
         except asyncio.CancelledError:
             pass
+
         finally:
             await pubsub_manager.unsubscribe(channel)
 

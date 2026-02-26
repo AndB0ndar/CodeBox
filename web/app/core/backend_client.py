@@ -1,4 +1,5 @@
 import requests
+import requests.exceptions as rex
 
 from flask import current_app
 
@@ -54,10 +55,15 @@ class BackendClient:
     def get_task_stream(task_id):
         url = f"{current_app.config['BACKEND_URL']}/api/v1/tasks/{task_id}/stream"
         def generate():
-            with requests.get(url, stream=True) as r:
-                for line in r.iter_lines():
-                    if line:
-                        yield line.decode('utf-8') + '\n'
+            try:
+                with requests.get(url, stream=True) as r:
+                    for line in r.iter_lines():
+                        if line:
+                            yield line.decode('utf-8') + '\n'
+            except (rex.ChunkedEncodingError, rex.ConnectionError) as e:
+                print(f"SSE stream closed: {e}")
+                return
+
         return current_app.response_class(
             generate(), mimetype='text/event-stream'
         )

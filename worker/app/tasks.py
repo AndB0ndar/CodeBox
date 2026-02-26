@@ -117,7 +117,9 @@ def run_task(task_id: str):
     stop_event = threading.Event()
     logs_buffer = BytesIO()
 
-    stats_dict = {}
+    stats_dict = {
+        'max_cpu': 0, 'max_memory': 0, 'max_memory_percent': 0, 'count': 0
+    }
     exit_code = -1
 
     timed_out = False

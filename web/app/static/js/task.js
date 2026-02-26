@@ -87,6 +87,7 @@ function connectSSE() {
         console.error('SSE connection error, falling back to polling');
         eventSource.close();
         fallbackPolling();
+        // setTimeout(connectSSE, 3000);
     };
 }
 
