@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Задача {{ task_id }}{% endblock %}
+{% block content %}
+<h1>Задача: {{ task_id }}</h1>
+
+<div id="task-info">
+    <p><strong>Статус:</strong> <span id="status">загрузка...</span></p>
+    <p><strong>Язык:</strong> <span id="language"></span></p>
+    <p><strong>Код:</strong></p>
+    <pre id="code" style="background:#f4f4f4; padding:10px;"></pre>
+    <p><strong>Логи:</strong></p>
+    <pre id="logs" style="background:#eee; padding:10px; max-height:300px; overflow:auto;"></pre>
+    <p><strong>Код возврата:</strong> <span id="exit_code"></span></p>
+</div>
+
+<script src="{{ url_for('static', filename='js/task.js') }}"></script>
+{% endblock %}

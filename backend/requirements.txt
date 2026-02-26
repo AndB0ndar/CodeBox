@@ -1,0 +1,9 @@
+fastapi==0.133.1
+uvicorn[standard]==0.41.0
+motor==3.7.1
+pydantic==2.12.5
+pydantic-settings==2.13.1
+python-dotenv==1.2.1
+redis==7.2.1
+rq==2.7.0
+minio==7.2.20

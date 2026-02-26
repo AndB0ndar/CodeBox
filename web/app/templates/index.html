@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Отправить код{% endblock %}
+{% block content %}
+<h1>Запустить код в изолированном окружении</h1>
+<form action="{{ url_for('main.submit') }}" method="post">
+    <label for="language">Язык:</label>
+    <select name="language" id="language">
+        <option value="python">Python</option>
+        <option value="javascript">JavaScript (Node.js)</option>
+        <option value="bash">Bash</option>
+    </select>
+    <br><br>
+    <label for="code">Код:</label><br>
+    <textarea name="code" id="code" rows="15" cols="80" placeholder="Введите код..."></textarea>
+    <br><br>
+    <button type="submit">Запустить</button>
+</form>
+{% endblock %}

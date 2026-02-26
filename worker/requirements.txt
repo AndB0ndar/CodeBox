@@ -1,0 +1,6 @@
+rq==2.7.0
+docker==7.1.0
+pymongo==4.16.0
+redis==7.2.1
+python-dotenv==1.2.1
+minio==7.2.20
