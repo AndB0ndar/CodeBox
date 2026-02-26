@@ -1,0 +1,3 @@
+-r backend/requirements.txt
+-r web/requirements.txt
+-r worker/requirements.txt
