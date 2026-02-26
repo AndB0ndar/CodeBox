@@ -61,7 +61,11 @@ User → Web UI → Backend → Redis Queue → Worker → Docker
 
 3. Start all services:
    ```bash
-   docker-compose up --build
+   docker-compose -f docker/docker-compose.yml up --build -d
+   ```
+   or
+   ```bash
+   make up
    ```
 
 4. Access the web UI at [http://localhost:5000](http://localhost:5000)
@@ -120,7 +124,7 @@ The test suite mocks external services (MongoDB, Redis, Docker, MinIO) so no act
 ├── web/               # Flask web UI
 ├── worker/            # RQ worker that runs Docker containers
 ├── tests/             # Unit and integration tests
-├── docker-compose.yml # Main compose file
+├── docker/            # Compose files
 └── README.md
 ```
 
