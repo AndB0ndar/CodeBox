@@ -4,6 +4,7 @@ const languageSpan = document.getElementById('language');
 const codePre = document.getElementById('code');
 const logsPre = document.getElementById('logs');
 const exitCodeSpan = document.getElementById('exit_code');
+const metricsDiv = document.getElementById('metrics');
 
 
 function fetchTask() {
@@ -17,6 +18,7 @@ function fetchTask() {
 
             if (task.status === 'completed' || task.status === 'failed') {
                 fetchLogs();
+                fetchMetrics();
             } else {
                 logsPre.textContent = 'Логи появятся после завершения...';
                 setTimeout(fetchTask, 2000);
@@ -42,6 +44,32 @@ function fetchLogs() {
         .catch(error => {
             console.error('Ошибка загрузки логов:', error);
             logsPre.textContent = 'Не удалось загрузить логи.';
+        });
+}
+
+function fetchMetrics() {
+    fetch(`/api/tasks/${taskId}/metrics`)
+        .then(response => response.json())
+        .then(metrics => {
+            let html = '<ul>';
+            if (metrics.max_cpu !== undefined) {
+                html += `<li>Макс. CPU: ${metrics.max_cpu.toFixed(2)}%</li>`;
+            }
+            if (metrics.avg_cpu !== undefined) {
+                html += `<li>Средн. CPU: ${metrics.avg_cpu.toFixed(2)}%</li>`;
+            }
+            if (metrics.max_memory !== undefined) {
+                html += `<li>Макс. память: ${(metrics.max_memory / 1024 / 1024).toFixed(2)} MB</li>`;
+            }
+            if (metrics.avg_memory !== undefined) {
+                html += `<li>Средн. память: ${(metrics.avg_memory / 1024 / 1024).toFixed(2)} MB</li>`;
+            }
+            html += '</ul>';
+            metricsDiv.innerHTML = html;
+        })
+        .catch(error => {
+            console.error('Ошибка загрузки метрик:', error);
+            metricsDiv.innerHTML = '<p>Метрики недоступны.</p>';
         });
 }
 

@@ -59,3 +59,11 @@ def api_task_logs(task_id):
     except requests.exceptions.RequestException as e:
         return jsonify({"error": "Failed to retrieve logs"}), 502
 
+
+@main_bp.route('/api/tasks/<task_id>/metrics')
+def api_task_metrics(task_id):
+    metrics = BackendClient.get_task_metrics(task_id)
+    if metrics is None:
+        return jsonify({"error": "Metrics not found"}), 404
+    return jsonify(metrics)
+

@@ -63,3 +63,14 @@ async def get_task_logs(task_id: str):
             status_code=500, detail=f"Error generating logs URL: {str(e)}"
         )
 
+
+@router.get("/tasks/{task_id}/metrics")
+async def get_task_metrics(task_id: str):
+    task = await mongodb.db.tasks.find_one({"_id": task_id})
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    metrics = task.get("metrics")
+    if not metrics:
+        raise HTTPException(status_code=404, detail="Metrics not available")
+    return metrics
+
