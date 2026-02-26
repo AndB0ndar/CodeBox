@@ -5,12 +5,14 @@ from datetime import datetime, timedelta
 
 from rq import Queue
 from redis import Redis
+from sse_starlette.sse import EventSourceResponse
 
 from fastapi import APIRouter, HTTPException
 
 from app.core.config import settings
 from app.core.database import mongodb
 from app.core.minio import minio_client
+from app.core.redis_pubsub import pubsub_manager
 from app.models.task import TaskCreate, TaskInDB
 
 
@@ -73,4 +75,26 @@ async def get_task_metrics(task_id: str):
     if not metrics:
         raise HTTPException(status_code=404, detail="Metrics not available")
     return metrics
+
+
+@router.get("/tasks/{task_id}/stream")
+async def stream_task_status(task_id: str):
+    async def event_generator():
+        channel = f"task:{task_id}"
+        await pubsub_manager.subscribe(channel)
+        try:
+            while True:
+                message = await pubsub_manager.get_message()
+                if message and message['type'] == 'message':
+                    yield {
+                        "event": "status_update",
+                        "data": message['data']
+                    }
+                await asyncio.sleep(0.1)
+        except asyncio.CancelledError:
+            pass
+        finally:
+            await pubsub_manager.unsubscribe(channel)
+
+    return EventSourceResponse(event_generator())
 

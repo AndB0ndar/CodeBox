@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from app.api.v1 import tasks
 from app.core.config import settings
+from app.core.redis_pubsub import pubsub_manager
 from app.core.database import connect_to_mongo, close_mongo_connection
 
 
@@ -10,9 +11,13 @@ from app.core.database import connect_to_mongo, close_mongo_connection
 async def lifespan(app: FastAPI):
     # Startup
     await connect_to_mongo()
+    await pubsub_manager.connect()
+
     yield
+
     # Shutdown
     await close_mongo_connection()
+    await pubsub_manager.close()
 
 
 app = FastAPI(

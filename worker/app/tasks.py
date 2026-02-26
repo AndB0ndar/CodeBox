@@ -1,4 +1,6 @@
 import time
+import json
+import redis
 import threading
 
 from io import BytesIO
@@ -11,6 +13,16 @@ from .core.config import config
 from .core.mongo import mongodb
 from .core.docker_client import get_docker_client
 from .core.minio_client import get_minio_client
+
+
+redis_client = redis.Redis.from_url(config.REDIS_URL)
+
+
+def publish_status(task_id, status, exit_code=None):
+    message = {"task_id": task_id, "status": status}
+    if exit_code is not None:
+        message["exit_code"] = exit_code
+    redis_client.publish(f"task:{task_id}", json.dumps(message))
 
 
 def collect_stats(container, stats_dict, stop_event):
@@ -79,6 +91,7 @@ def run_task(task_id: str):
         {"_id": task_id},
         {"$set": {"status": "running", "started_at": datetime.utcnow()}}
     )
+    publish_status(task_id, "running")
 
 
     if language == 'python':
@@ -95,6 +108,7 @@ def run_task(task_id: str):
             {"_id": task_id},
             {"$set": {"status": "failed", "finished_at": datetime.utcnow()}}
         )
+        publish_status(task_id, "failed")
         return
 
     container = None
@@ -220,5 +234,6 @@ def run_task(task_id: str):
         "metrics": stats_dict,
     }
     mongodb.db.tasks.update_one({"_id": task_id}, {"$set": update_data})
+    publish_status(task_id, update_data["status"], exit_code)
     print(f"Task {task_id} finished with exit code {exit_code}")
 

@@ -74,3 +74,8 @@ def api_task_metrics(task_id):
         return jsonify({"error": "Metrics not found"}), 404
     return jsonify(metrics)
 
+
+@main_bp.route('/api/tasks/<task_id>/stream')
+def stream_task_status(task_id):
+    return BackendClient.get_task_stream(task_id)
+

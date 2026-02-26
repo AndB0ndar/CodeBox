@@ -50,3 +50,15 @@ class BackendClient:
         response.raise_for_status()
         return response.json()
 
+    @staticmethod
+    def get_task_stream(task_id):
+        url = f"{current_app.config['BACKEND_URL']}/api/v1/tasks/{task_id}/stream"
+        def generate():
+            with requests.get(url, stream=True) as r:
+                for line in r.iter_lines():
+                    if line:
+                        yield line.decode('utf-8') + '\n'
+        return current_app.response_class(
+            generate(), mimetype='text/event-stream'
+        )
+

@@ -7,3 +7,5 @@ python-dotenv==1.2.1
 redis==7.2.1
 rq==2.7.0
 minio==7.2.20
+sse-starlette==3.2.0
+aioredis==2.0.1

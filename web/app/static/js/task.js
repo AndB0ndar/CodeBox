@@ -7,30 +7,8 @@ const logsPre = document.getElementById('logs');
 const exitCodeSpan = document.getElementById('exit_code');
 const metricsDiv = document.getElementById('metrics');
 
+let eventSource = null;
 
-function fetchTask() {
-    fetch(`/api/tasks/${taskId}`)
-        .then(response => response.json())
-        .then(task => {
-            statusSpan.textContent = task.status;
-            languageSpan.textContent = task.language;
-            limitsSpan.textContent = `CPU: ${task.cpu_limit} ядер, Память: ${task.memory_limit}, Таймаут: ${task.timeout}с`;
-            codePre.textContent = task.code;
-            exitCodeSpan.textContent = task.exit_code !== null ? task.exit_code : '—';
-
-            if (task.status === 'completed' || task.status === 'failed' || task.status === 'timeout') {
-                fetchLogs();
-                fetchMetrics();
-            } else {
-                logsPre.textContent = 'Логи появятся после завершения...';
-                setTimeout(fetchTask, 2000);
-            }
-        })
-        .catch(error => {
-            console.error('Ошибка:', error);
-            statusSpan.textContent = 'ошибка загрузки';
-        });
-}
 
 function fetchLogs() {
     fetch(`/api/tasks/${taskId}/logs`)
@@ -75,5 +53,62 @@ function fetchMetrics() {
         });
 }
 
-fetchTask();
+function fetchInitialTask() {
+    fetch(`/api/tasks/${taskId}`)
+        .then(response => response.json())
+        .then(task => {
+            languageSpan.textContent = task.language;
+            limitsSpan.textContent = `CPU: ${task.cpu_limit} ядер, Память: ${task.memory_limit}, Таймаут: ${task.timeout}с`;
+            codePre.textContent = task.code;
+        })
+        .catch(error => console.error('Ошибка загрузки задачи:', error));
+}
+
+function connectSSE() {
+    if (eventSource) {
+        eventSource.close();
+    }
+    eventSource = new EventSource(`/api/tasks/${taskId}/stream`);
+
+    eventSource.addEventListener('status_update', function(event) {
+        const data = JSON.parse(event.data);
+        statusSpan.textContent = data.status;
+        if (data.exit_code !== undefined) {
+            exitCodeSpan.textContent = data.exit_code;
+        }
+        if (task.status === 'completed' || task.status === 'failed' || task.status === 'timeout') {
+            eventSource.close();
+            fetchLogs();
+            fetchMetrics();
+        }
+    });
+
+    eventSource.onerror = function() {
+        console.error('SSE connection error, falling back to polling');
+        eventSource.close();
+        fallbackPolling();
+    };
+}
+
+function fallbackPolling() {
+    function poll() {
+        fetch(`/api/tasks/${taskId}`)
+            .then(response => response.json())
+            .then(task => {
+                statusSpan.textContent = task.status;
+                if (task.status === 'completed' || task.status === 'failed' || task.status === 'timeout') {
+                    fetchLogs();
+                    fetchMetrics();
+                } else {
+                    setTimeout(poll, 2000);
+                }
+            })
+            .catch(error => console.error('Polling error:', error));
+    }
+    poll();
+}
+
+
+fetchInitialTask();
+connectSSE();
 
