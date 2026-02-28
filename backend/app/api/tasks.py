@@ -32,7 +32,7 @@ async def create_task(task: TaskCreate):
     return {"task_id": task_doc.id}
 
 
-@router.get("/tasks/{task_id}", response_model=TaskInDB)
+@router.get("/{task_id}", response_model=TaskInDB)
 async def get_task(task_id: str):
     task = await mongodb.db.tasks.find_one({"_id": task_id})
     if not task:
@@ -40,14 +40,14 @@ async def get_task(task_id: str):
     return task
 
 
-@router.get("/tasks", response_model=List[TaskInDB])
+@router.get("/", response_model=List[TaskInDB])
 async def list_tasks(limit: int = 10):
     cursor = mongodb.db.tasks.find().sort("created_at", -1).limit(limit)
     tasks = await cursor.to_list(length=limit)
     return tasks
 
 
-@router.get("/tasks/{task_id}/logs")
+@router.get("/{task_id}/logs")
 async def get_task_logs(task_id: str):
     task = await mongodb.db.tasks.find_one({"_id": task_id})
     if not task:
@@ -68,7 +68,7 @@ async def get_task_logs(task_id: str):
         )
 
 
-@router.get("/tasks/{task_id}/metrics")
+@router.get("/{task_id}/metrics")
 async def get_task_metrics(task_id: str):
     task = await mongodb.db.tasks.find_one({"_id": task_id})
     if not task:
@@ -79,7 +79,7 @@ async def get_task_metrics(task_id: str):
     return metrics
 
 
-@router.get("/tasks/{task_id}/stream")
+@router.get("/{task_id}/stream")
 async def stream_task_status(task_id: str):
     task = await mongodb.db.tasks.find_one({"_id": task_id})
     if not task:
