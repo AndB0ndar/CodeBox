@@ -86,7 +86,7 @@ User → Web UI → Backend → Redis Queue → Worker → Docker
 The backend exposes a REST API on port `8000`.  
 Example endpoints:
 
-- `POST /api/v1/tasks` – create a new task  
+- `POST /api/tasks` – create a new task  
   Body:
   ```json
   {
@@ -99,11 +99,11 @@ Example endpoints:
   ```
   Response: `{ "task_id": "uuid" }`
 
-- `GET /api/v1/tasks/{task_id}` – get task details
-- `GET /api/v1/tasks/{task_id}/logs` – get a presigned URL for logs stored in MinIO
-- `GET /api/v1/tasks/{task_id}/metrics` – get execution metrics (CPU, memory)
-- `GET /api/v1/tasks/{task_id}/stream` – SSE stream for real‑time status updates
-- `GET /api/v1/tasks` – list tasks (with `?limit=`)
+- `GET /api/tasks/{task_id}` – get task details
+- `GET /api/tasks/{task_id}/logs` – get a presigned URL for logs stored in MinIO
+- `GET /api/tasks/{task_id}/metrics` – get execution metrics (CPU, memory)
+- `GET /api/tasks/{task_id}/stream` – SSE stream for real‑time status updates
+- `GET /api/tasks` – list tasks (with `?limit=`)
 
 ## Testing
 
