@@ -1,6 +1,6 @@
 # Task Runner Service
 
-A secure, containerized code execution service with real-time monitoring and resource isolation.  
+A secure, containerized code execution service with real-time monitoring and resource isolation.
 Run arbitrary code in isolated Docker containers, collect logs and metrics, and stream status updates via Server-Sent Events.
 
 ## Features

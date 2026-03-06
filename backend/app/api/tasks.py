@@ -24,7 +24,7 @@ redis_conn = Redis.from_url(settings.REDIS_URL)
 task_queue = Queue(connection=redis_conn)
 
 
-@router.post("/tasks", response_model=dict)
+@router.post("/", response_model=dict)
 async def create_task(task: TaskCreate):
     task_doc = TaskInDB(**task.dict())
     await mongodb.db.tasks.insert_one(task_doc.model_dump(by_alias=True))
@@ -54,7 +54,7 @@ async def get_task_logs(task_id: str):
         raise HTTPException(status_code=404, detail="Task not found")
     if not task.get("logs_object"):
         raise HTTPException(status_code=404, detail="Logs not available yet")
-    
+
     try:
         url = minio_client.presigned_get_object(
             bucket_name=settings.MINIO_BUCKET,
