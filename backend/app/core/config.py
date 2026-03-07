@@ -1,5 +1,6 @@
 import os
 
+from typing import List
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 
@@ -21,6 +22,9 @@ class Settings(BaseSettings):
 
     PROJECT_NAME: str = "Task Runner API"
     VERSION: str = "0.1.0"
+
+    # list of Flask urls and domens
+    ALLOWED_ORIGINS: List[str] = os.getenv("ALLOWED_ORIGINS", "").split(",") if os.getenv("ALLOWED_ORIGINS") else ["*"]
 
 
 settings = Settings()

@@ -1,19 +1,35 @@
 {% extends "base.html" %}
 {% block title %}Задача {{ task_id }}{% endblock %}
 {% block content %}
-<h1>Задача: {{ task_id }}</h1>
+<div class="task-detail">
+    <div class="task-detail__header">
+        <h1 class="task-detail__title">Задача: {{ task_id }}</h1>
+        <div class="task-detail__meta">
+            <span class="task-detail__meta-item">Язык: <span id="language"></span></span>
+            <span class="task-detail__meta-item">Ограничения: <span id="limits"></span></span>
+            <span class="task-detail__meta-item">Статус: <span id="status" class="status"></span></span>
+        </div>
+    </div>
 
-<div id="task-info">
-    <p><strong>Статус:</strong> <span id="status">загрузка...</span></p>
-    <p><strong>Язык:</strong> <span id="language"></span></p>
-    <p><strong>Ограничения:</strong> <span id="limits"></span></p>
-    <p><strong>Код:</strong></p>
-    <pre id="code" style="background:#f4f4f4; padding:10px;"></pre>
-    <p><strong>Логи:</strong></p>
-    <pre id="logs" style="background:#eee; padding:10px; max-height:300px; overflow:auto;"></pre>
-    <p><strong>Код возврата:</strong> <span id="exit_code"></span></p>
-    <p><strong>Метрики:</strong></p>
-    <div id="metrics"></div>
+    <div class="task-detail__section">
+        <h2 class="task-detail__section-title">Код</h2>
+        <pre id="code" class="code-block"></pre>
+    </div>
+
+    <div class="task-detail__section">
+        <h2 class="task-detail__section-title">Логи</h2>
+        <pre id="logs" class="logs">Логи появятся после завершения...</pre>
+    </div>
+
+    <div class="task-detail__section">
+        <h2 class="task-detail__section-title">Результат</h2>
+        <p>Код возврата: <span id="exit_code"></span></p>
+    </div>
+
+    <div class="task-detail__section">
+        <h2 class="task-detail__section-title">Метрики</h2>
+        <div id="metrics" class="metrics"></div>
+    </div>
 </div>
 
 <script src="{{ url_for('static', filename='js/task.js') }}"></script>

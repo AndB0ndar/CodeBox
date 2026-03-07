@@ -23,6 +23,11 @@ class RedisPubSubManager:
     async def get_message(self):
         return await self.pubsub.get_message(ignore_subscribe_messages=True)
 
+    async def listens(self):
+        async for message in self.pubsub.listen():
+            if message['type'] == 'message':
+                yield message
+
     async def close(self):
         if self.pubsub:
             await self.pubsub.close()

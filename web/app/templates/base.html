@@ -4,13 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Task Runner{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <nav>
-        <a href="{{ url_for('site.index') }}">Главная</a>
-    </nav>
-    <main>
+    <header class="header">
+        <div class="header__container">
+            <a href="{{ url_for('site.index') }}" class="header__logo">Task Runner</a>
+            <nav class="header__nav">
+                <a href="{{ url_for('site.index') }}" class="header__link">Главная</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="main">
         {% block content %}{% endblock %}
     </main>
 </body>

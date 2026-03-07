@@ -1,7 +1,7 @@
 import requests
 import requests.exceptions as rex
 
-from flask import current_app
+from flask import current_app, stream_with_context
 
 
 class BackendClient:
@@ -56,15 +56,35 @@ class BackendClient:
         url = f"{current_app.config['BACKEND_URL']}/api/tasks/{task_id}/stream"
         def generate():
             try:
-                with requests.get(url, stream=True) as r:
-                    for line in r.iter_lines():
-                        if line:
-                            yield line.decode('utf-8') + '\n'
-            except (rex.ChunkedEncodingError, rex.ConnectionError) as e:
-                print(f"SSE stream closed: {e}")
-                return
+                with requests.get(url, stream=True) as resp:
+                    if resp.status_code != 200:
+                        yield f"event: error\ndata: Backend error (status {resp.status_code})\n\n"
+                        return
+
+                    for line in resp.iter_lines():
+                        try:
+                            if line:
+                                yield line.decode('utf-8') + '\n'
+                            else:
+                                yield '\n'
+                        except (GeneratorExit, BrokenPipeError, ConnectionError):
+                            print(f"Client disconnected for task {task_id}")
+                            break
+
+            except requests.exceptions.RequestException as e:
+                print(f"Backend connection error for task {task_id}: {e}")
+                yield f"event: error\ndata: Cannot connect to backend for task {task_id}\n\n"
+
+            except Exception as e:
+                print(f"Proxy error: {e}")
+                yield f"event: error\ndata: Internal error\n\n"
 
         return current_app.response_class(
-            generate(), mimetype='text/event-stream'
+            stream_with_context(generate()),
+            mimetype="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "Access-Control-Allow-Origin": "*"
+            }
         )
-

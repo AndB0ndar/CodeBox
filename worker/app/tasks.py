@@ -19,7 +19,10 @@ redis_client = redis.Redis.from_url(config.REDIS_URL)
 
 
 def publish_status(task_id, status, exit_code=None):
-    message = {"task_id": task_id, "status": status}
+    message = {
+        "task_id": task_id, 
+        "status": status
+    }
     if exit_code is not None:
         message["exit_code"] = exit_code
     redis_client.publish(f"task:{task_id}", json.dumps(message))
