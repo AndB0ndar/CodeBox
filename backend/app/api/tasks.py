@@ -1,145 +1,176 @@
 import json
-import time
 import asyncio
-import urllib.parse
-
-from typing import List, Optional
-from datetime import datetime, timedelta
-
-from rq import Queue
-from redis import Redis
-from sse_starlette.sse import EventSourceResponse
+import logging
+from typing import List
 
 from fastapi.responses import StreamingResponse
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, Depends, Query
 
-from app.core.config import settings
-from app.core.database import mongodb
-from app.core.minio import minio_client
-from app.core.redis_pubsub import pubsub_manager
 from app.models.task import TaskCreate, TaskInDB
+from app.api.dependencies import get_task_service
+from app.services.task_service import TaskService
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-redis_conn = Redis.from_url(settings.REDIS_URL)
-task_queue = Queue(connection=redis_conn)
+
+@router.post(
+    "/",
+    response_model=dict,
+    summary="Create a new task",
+    description="Enqueue a task for execution. Returns the task ID immediately.",
+    response_description="Task ID",
+)
+async def create_task(
+    task: TaskCreate,
+    service: TaskService = Depends(get_task_service),
+):
+    """Create a task and add it to the queue."""
+    task_id = await service.create_task(task)
+    return {"task_id": task_id}
 
 
-@router.post("/", response_model=dict)
-async def create_task(task: TaskCreate):
-    task_doc = TaskInDB(**task.dict())
-    await mongodb.db.tasks.insert_one(task_doc.model_dump(by_alias=True))
-    task_queue.enqueue('app.tasks.run_task', task_doc.id)
-    return {"task_id": task_doc.id}
-
-
-@router.get("/{task_id}", response_model=TaskInDB)
-async def get_task(task_id: str):
-    task = await mongodb.db.tasks.find_one({"_id": task_id})
+@router.get(
+    "/{task_id}",
+    response_model=TaskInDB,
+    summary="Get task details",
+    description="Retrieve a task document by its ID.",
+    responses={404: {"description": "Task not found"}},
+)
+async def get_task(
+    task_id: str,
+    service: TaskService = Depends(get_task_service),
+):
+    """Fetch a single task from MongoDB."""
+    task = await service.get_task(task_id)
     if not task:
+        logger.warning(f"Task not found: {task_id}")
         raise HTTPException(status_code=404, detail="Task not found")
     return task
 
 
-@router.get("/", response_model=List[TaskInDB])
-async def list_tasks(limit: int = 10):
-    cursor = mongodb.db.tasks.find().sort("created_at", -1).limit(limit)
-    tasks = await cursor.to_list(length=limit)
+@router.get(
+    "/",
+    response_model=List[TaskInDB],
+    summary="List tasks",
+    description="Return a list of recent tasks, sorted by creation date descending.",
+)
+async def list_tasks(
+    limit: int = Query(
+        10,
+        ge=1,
+        le=100,
+        description="Maximum number of tasks to return",
+        examples=[5, 10, 20],
+    ),
+    service: TaskService = Depends(get_task_service),
+):
+    """Fetch the most recent tasks."""
+    tasks = await service.list_tasks(limit)
     return tasks
 
 
-@router.get("/{task_id}/logs")
-async def get_task_logs(task_id: str):
-    task = await mongodb.db.tasks.find_one({"_id": task_id})
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    if not task.get("logs_object"):
+@router.get(
+    "/{task_id}/logs",
+    summary="Get task logs URL",
+    description="Generate a pre‑signed URL to download the task logs from MinIO.",
+    responses={
+        404: {"description": "Task or logs not found"},
+        500: {"description": "MinIO error"},
+    },
+)
+async def get_task_logs(
+    task_id: str,
+    service: TaskService = Depends(get_task_service),
+):
+    """Return a temporary URL (valid for 5 minutes) for logs."""
+    try:
+        url = await service.get_task_logs_url(task_id)
+    except Exception as e:
+        logger.error(f"MinIO error for task {task_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate logs URL")
+
+    if url is None:
+        # Distinguish between task not found and logs not available
+        task = await service.get_task(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
         raise HTTPException(status_code=404, detail="Logs not available yet")
 
-    try:
-        url = minio_client.presigned_get_object(
-            bucket_name=settings.MINIO_BUCKET,
-            object_name=task["logs_object"],
-            expires=timedelta(seconds=5*60)
-        )
-        return {"url": url}
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error generating logs URL: {str(e)}"
-        )
+    return {"url": url}
 
 
-@router.get("/{task_id}/metrics")
-async def get_task_metrics(task_id: str):
-    task = await mongodb.db.tasks.find_one({"_id": task_id})
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    metrics = task.get("metrics")
+@router.get(
+    "/{task_id}/metrics",
+    summary="Get task metrics",
+    description="Retrieve execution metrics (CPU, memory, etc.) for a completed task.",
+    responses={404: {"description": "Task or metrics not found"}},
+)
+async def get_task_metrics(
+    task_id: str,
+    service: TaskService = Depends(get_task_service),
+):
+    """Return the metrics object stored with the task."""
+    metrics = await service.get_task_metrics(task_id)
     if metrics is None:
+        task = await service.get_task(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
         raise HTTPException(status_code=404, detail="Metrics not available")
     return metrics
 
 
-async def event_generator(request: Request, task_id: str):
-    TERMINAL_STATUSES = ["completed", "failed", "timeout"]
-
-    channel = f"task:{task_id}"
-    await pubsub_manager.subscribe(channel)
-
+async def _stream_wrapper(request: Request, service: TaskService, task_id: str):
+    """
+    Wraps the service's status_event_generator to format SSE and handle client disconnection.
+    """
     try:
-        task = await mongodb.db.tasks.find_one({"_id": task_id})
-        if task is None:
-            yield f"event: error\ndata: Task {task_id} not found\n\n"
-            return
-        if task.get("status") in TERMINAL_STATUSES:
-            data = {
-                "task_id": task_id,
-                "status": task["status"],
-                "exit_code": task.get("exit_code"),
-                "timestamp": task.get("finished_at", datetime.now()).isoformat()
-            }
-            yield f"data: {json.dumps(data)}\n\n"
-            yield f"event: done\ndata: Task finished with status {task['status']}\n\n"
-            return
-
-        async for message in pubsub_manager.listens():
+        async for event in service.status_event_generator(task_id):
             if await request.is_disconnected():
+                logger.debug(f"Client disconnected from stream {task_id}")
                 break
 
-            try:
-                data = json.loads(message["data"])
-            except json.JSONDecodeError:
-                continue
-
-            response_data = {
-                "task_id": data.get("task_id", task_id),
-                "status": data.get("status", "unknown"),
-                "exit_code": data.get("exit_code"),
-                "timestamp": time.time()
-            }
-            yield f"data: {json.dumps(response_data)}\n\n"
-
-            if data["status"] in TERMINAL_STATUSES:
-                yield f"event: done\ndata: Task finished with status {data['status']}\n\n"
-                break
-
+            if "event" in event:
+                yield f"event: {event['event']}\ndata: {json.dumps(event['data'])}\n\n"
+            else:
+                yield f"data: {json.dumps(event['data'])}\n\n"
     except asyncio.CancelledError:
+        logger.debug(f"Stream task {task_id} cancelled")
         pass
 
-    finally:
-        await pubsub_manager.unsubscribe(channel)
-        await pubsub_manager.close()
 
-
-@router.get("/{task_id}/stream")
-async def stream_task_status(request: Request, task_id: str):
-    task = await mongodb.db.tasks.find_one({"_id": task_id})
+@router.get(
+    "/{task_id}/stream",
+    summary="Stream task status (SSE)",
+    description="""
+    Server‑Sent Events endpoint that pushes real‑time status updates for a task.
+    Events are `data` (status update) and `done` (task finished).
+    """,
+    responses={
+        200: {
+            "description": "Server‑Sent Events stream",
+            "content": {"text/event-stream": {}},
+        },
+        404: {"description": "Task not found"},
+    },
+)
+async def stream_task_status(
+    request: Request,
+    task_id: str,
+    service: TaskService = Depends(get_task_service),
+):
+    """Subscribe to Redis pub/sub and stream task status updates."""
+    # Quick check that task exists
+    # (service generator will also check, but we want early 404)
+    task = await service.get_task(task_id)
     if not task:
+        logger.warning(f"Task not found for streaming: {task_id}")
         raise HTTPException(status_code=404, detail="Task not found")
 
+    logger.info(f"Starting status stream for task {task_id}")
     return StreamingResponse(
-        event_generator(request, task_id),
+        _stream_wrapper(request, service, task_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
