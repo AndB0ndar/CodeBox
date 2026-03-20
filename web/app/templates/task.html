@@ -5,25 +5,44 @@
     <div class="task-detail__header">
         <h1 class="task-detail__title">Задача: {{ task_id }}</h1>
         <div class="task-detail__meta">
-            <span class="task-detail__meta-item">Язык: <span id="language"></span></span>
-            <span class="task-detail__meta-item">Ограничения: <span id="limits"></span></span>
-            <span class="task-detail__meta-item">Статус: <span id="status" class="status"></span></span>
+            <span class="task-detail__meta-item">
+                Язык: <span id="language"></span>
+            </span>
+            <div class="task-detail__meta-item">
+                <span>Ограничения:</span>
+                <div class="limits-grid" id="limits-grid"></div>
+            </div>
+            <span class="task-detail__meta-item">
+                Код возврата: <span id="exit_code" class="exit-code-meta">-</span>
+            </span>
+            <span class="task-detail__meta-item">
+                Статус: <span id="status" class="status"></span>
+            </span>
         </div>
     </div>
 
     <div class="task-detail__section">
         <h2 class="task-detail__section-title">Код</h2>
-        <pre id="code" class="code-block"></pre>
+        <div class="code-wrapper">
+            <pre id="code" class="code-block"><code id="code-content"></code></pre>
+            <button class="copy-btn" data-clipboard-target="#code-content" title="Копировать код">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M16 1H4C2.9 1 2 1.9 2 3V17H4V3H16V1ZM19 5H8C6.9 5 6 5.9 6 7V21C6 22.1 6.9 23 8 23H19C20.1 23 21 22.1 21 21V7C21 5.9 20.1 5 19 5ZM19 21H8V7H19V21Z" fill="currentColor"/>
+                </svg>
+            </button>
+        </div>
     </div>
 
     <div class="task-detail__section">
         <h2 class="task-detail__section-title">Логи</h2>
-        <pre id="logs" class="logs">Логи появятся после завершения...</pre>
-    </div>
-
-    <div class="task-detail__section">
-        <h2 class="task-detail__section-title">Результат</h2>
-        <p>Код возврата: <span id="exit_code"></span></p>
+        <div class="code-wrapper">
+            <pre id="logs" class="logs"><code id="logs-content"></code></pre>
+            <button class="copy-btn" data-clipboard-target="#logs-content" title="Копировать логи">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M16 1H4C2.9 1 2 1.9 2 3V17H4V3H16V1ZM19 5H8C6.9 5 6 5.9 6 7V21C6 22.1 6.9 23 8 23H19C20.1 23 21 22.1 21 21V7C21 5.9 20.1 5 19 5ZM19 21H8V7H19V21Z" fill="currentColor"/>
+                </svg>
+            </button>
+        </div>
     </div>
 
     <div class="task-detail__section">

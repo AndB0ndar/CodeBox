@@ -15,23 +15,27 @@
 
         <div class="submit-form__group">
             <label for="code" class="submit-form__label">Код:</label>
-            <textarea name="code" id="code" class="submit-form__textarea" placeholder="Введите код..."></textarea>
+            <textarea name="code" id="code" style="display: none;"></textarea>
+            <div id="code-editor"></div>
         </div>
 
         <div class="submit-form__group">
             <h3 class="submit-form__label">Ограничения</h3>
-            <div class="submit-form__inline-group">
-                <div class="submit-form__group">
-                    <label for="cpu_limit" class="submit-form__label">CPU (ядра):</label>
-                    <input type="number" name="cpu_limit" id="cpu_limit" class="submit-form__input" value="1.0" step="0.1" min="0.1" max="8">
-                </div>
-                <div class="submit-form__group">
-                    <label for="memory_limit" class="submit-form__label">Память:</label>
-                    <input type="text" name="memory_limit" id="memory_limit" class="submit-form__input" value="256m" placeholder="например 256m, 1g">
-                </div>
-                <div class="submit-form__group">
-                    <label for="timeout" class="submit-form__label">Таймаут (сек):</label>
-                    <input type="number" name="timeout" id="timeout" class="submit-form__input" value="30" min="1" max="300">
+            <div class="limits-card">
+                <div class="limits-card__title">Ресурсы выполнения</div>
+                <div class="submit-form__inline-group">
+                    <div class="submit-form__group">
+                        <label for="cpu_limit" class="submit-form__label">CPU (ядра)</label>
+                        <input type="number" name="cpu_limit" id="cpu_limit" class="submit-form__input" value="1.0" step="0.1" min="0.1" max="8">
+                    </div>
+                    <div class="submit-form__group">
+                        <label for="memory_limit" class="submit-form__label">Память</label>
+                        <input type="text" name="memory_limit" id="memory_limit" class="submit-form__input" value="256m" placeholder="например 256m, 1g">
+                    </div>
+                    <div class="submit-form__group">
+                        <label for="timeout" class="submit-form__label">Таймаут (сек)</label>
+                        <input type="number" name="timeout" id="timeout" class="submit-form__input" value="30" min="1" max="300">
+                    </div>
                 </div>
             </div>
         </div>
@@ -39,4 +43,42 @@
         <button type="submit" class="button button--primary">Запустить</button>
     </form>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const textarea = document.getElementById('code');
+        const languageSelect = document.getElementById('language');
+        
+        const editor = CodeMirror(document.getElementById('code-editor'), {
+            value: textarea.value,
+            mode: getMode(languageSelect.value),
+            theme: 'material-darker',
+            lineNumbers: true,
+            autoCloseBrackets: true,
+            matchBrackets: true,
+            indentUnit: 4,
+            tabSize: 4,
+            lineWrapping: true,
+            viewportMargin: Infinity
+        });
+        
+        languageSelect.addEventListener('change', function() {
+            editor.setOption('mode', getMode(this.value));
+        });
+        
+        const form = document.querySelector('form');
+        form.addEventListener('submit', function() {
+            textarea.value = editor.getValue();
+        });
+        
+        function getMode(lang) {
+            switch(lang) {
+                case 'python': return 'python';
+                case 'javascript': return 'javascript';
+                case 'bash': return 'shell';
+                default: return 'text/plain';
+            }
+        }
+    });
+</script>
 {% endblock %}

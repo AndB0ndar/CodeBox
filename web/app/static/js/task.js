@@ -1,9 +1,9 @@
 const taskId = window.location.pathname.split('/').pop();
 const statusSpan = document.getElementById('status');
 const languageSpan = document.getElementById('language');
-const limitsSpan = document.getElementById('limits');
-const codePre = document.getElementById('code');
-const logsPre = document.getElementById('logs');
+const limitsGrid = document.getElementById('limits-grid');
+const codePre = document.getElementById('code-content');
+const logsPre = document.getElementById('logs-content');
 const exitCodeSpan = document.getElementById('exit_code');
 const metricsDiv = document.getElementById('metrics');
 
@@ -14,11 +14,12 @@ function setStatusClass(status) {
     statusSpan.classList.add(`status--${status}`);
 }
 
+
 function fetchLogs() {
     fetch(`/api/tasks/${taskId}/logs`)
         .then(response => {
             if (!response.ok) {
-            throw new Error('Failed to load logs');
+                throw new Error('Failed to load logs');
             }
             return response.text();
         })
@@ -74,7 +75,7 @@ function connectSSE() {
     source.onmessage = (event) => {
         const data = JSON.parse(event.data);
         setStatusClass(data.status);
-        exitCodeSpan.textContent = data.exit_code !== null ? data.exit_code : '—';;
+        exitCodeSpan.textContent = data.exit_code !== null ? data.exit_code : '—';
     };
 
     source.addEventListener('done', (event) => {
@@ -97,17 +98,70 @@ function connectSSE() {
     };
 }
 
+function setLimitsGrid(task) {
+    if (limitsGrid) {
+        limitsGrid.innerHTML = `
+            <div class="limit-badge">
+                <span class="limit-badge__icon">🧠</span>
+                <span class="limit-badge__label">CPU:</span>
+                <span class="limit-badge__value">${task.cpu_limit}</span>
+                <span>ядер</span>
+            </div>
+            <div class="limit-badge">
+                <span class="limit-badge__icon">💾</span>
+                <span class="limit-badge__label">Память:</span>
+                <span class="limit-badge__value">${task.memory_limit}</span>
+            </div>
+            <div class="limit-badge">
+                <span class="limit-badge__icon">⏱️</span>
+                <span class="limit-badge__label">Таймаут:</span>
+                <span class="limit-badge__value">${task.timeout}</span>
+                <span>с</span>
+            </div>
+        `;
+    }
+}
+
 function fetchInitialTask() {
     fetch(`/api/tasks/${taskId}`)
         .then(response => response.json())
         .then(task => {
             languageSpan.textContent = task.language;
-            limitsSpan.textContent = `CPU: ${task.cpu_limit} ядер, Память: ${task.memory_limit}, Таймаут: ${task.timeout}с`;
+            setLimitsGrid(task);
             codePre.textContent = task.code;
+            hljs.highlightElement(codePre);
         })
         .catch(error => console.error('Ошибка загрузки задачи:', error));
 }
 
-fetchInitialTask();
-connectSSE()
 
+function setupCopyButtons() {
+    document.querySelectorAll('.copy-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const targetId = btn.getAttribute('data-clipboard-target');
+            const target = document.querySelector(targetId);
+            if (target) {
+                try {
+                    await navigator.clipboard.writeText(target.textContent);
+                    btn.textContent = 'Скопировано!';
+                    btn.classList.add('copied');
+                    setTimeout(() => {
+                        btn.textContent = 'Копировать';
+                        btn.classList.remove('copied');
+                    }, 2000);
+                } catch (err) {
+                    console.error('Ошибка копирования:', err);
+                    btn.textContent = 'Ошибка';
+                    setTimeout(() => btn.textContent = 'Копировать', 1500);
+                }
+            }
+        });
+    });
+}
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    fetchInitialTask();
+    connectSSE();
+    setupCopyButtons();
+});
