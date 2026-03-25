@@ -15,7 +15,7 @@
 - MinIO 2023+
 - Зависимости из соответствующих `requirements.txt` (backend, worker, web)
 
-**Языки программирования:**
+#### Языки программирования
 
 - Backend: Python (FastAPI)
 - Worker: Python
@@ -23,7 +23,7 @@
 
 ### Функциональное назначение
 
-**Классы решаемых задач:**
+#### Классы решаемых задач
 
 - Удалённое выполнение кода на различных языках (Python, JavaScript, Bash)
 - Изолированное исполнение в Docker‑контейнерах с ограничением ресурсов (CPU, память, таймаут)
@@ -35,7 +35,7 @@
 
 **Назначение программы:** Профессиональная платформа для безопасного выполнения пользовательского кода в контролируемом окружении с возможностью мониторинга, сбора логов и метрик.
 
-**Функциональные ограничения на применение:**
+#### Функциональные ограничения на применение
 
 - Максимальный размер кода: 10 МБ (настраивается)
 - Максимальное время выполнения задачи: до 300 секунд (по умолчанию 30, настраивается пользователем)
@@ -44,7 +44,7 @@
 
 ### Описание логической структуры
 
-**Алгоритм программы:**
+#### Алгоритм программы
 
 1. **Аутентификация** – пользователь вводит логин/пароль, получает JWT-токен
 2. **Создание задачи** – пользователь отправляет код с параметрами (язык, CPU, память, таймаут)
@@ -55,7 +55,7 @@
 7. **Уведомления** – через Redis Pub/Sub клиент получает обновления статуса в реальном времени (SSE)
 8. **Результаты** – логи и метрики доступны через API и веб-интерфейс
 
-**Используемые методы:**
+#### Используемые методы
 
 - Микросервисная архитектура с разделением на backend, worker, web
 - REST API (FastAPI) с автоматической документацией (Swagger)
@@ -65,54 +65,117 @@
 - JWT-аутентификация с истечением токена
 - Rate limiting на уровне API и веб-интерфейса
 
-**Структура программы:**
+#### Структура программы
 
 ```
 .
-├── backend/                  # Backend-сервер (FastAPI)
-│   ├── app/
-│   │   ├── api/              # Эндпоинты (dependencies, tasks)
-│   │   ├── core/             # Конфигурация, БД, MinIO, Redis Pub/Sub
-│   │   ├── middleware/       # Промежуточное ПО (логирование)
-│   │   ├── models/           # Модели данных (task)
-│   │   ├── services/         # Бизнес-логика (task_service)
-│   │   └── main.py           # Точка входа
+├── backend
+│   ├── app
+│   │   ├── api
+│   │   │   ├── auth.py                 # Эндпоинты аутентификации
+│   │   │   ├── dependencies.py         # Зависимости для API (получение текущего пользователя)
+│   │   │   └── tasks.py                # Эндпоинты управления задачами
+│   │   ├── core
+│   │   │   ├── config.py               # Настройки из переменных окружения
+│   │   │   ├── database.py             # Подключение к MongoDB
+│   │   │   ├── minio.py                # Клиент MinIO
+│   │   │   ├── redis_pubsub.py         # Менеджер Redis Pub/Sub
+│   │   │   └── security.py             # Хеширование паролей, JWT
+│   │   ├── main.py                     # Точка входа FastAPI
+│   │   ├── middleware
+│   │   │   └── logging.py              # Middleware для логирования запросов
+│   │   ├── models
+│   │   │   ├── task.py                 # Модели задач (Pydantic)
+│   │   │   └── user.py                 # Модели пользователей
+│   │   └── services
+│   │       ├── task_service.py         # Бизнес-логика управления задачами
+│   │       └── user_service.py         # Бизнес-логика управления пользователями
 │   ├── Dockerfile
+│   ├── README.md
 │   └── requirements.txt
-├── web/                      # Веб-сервер (Flask)
-│   ├── app/
-│   │   ├── core/             # Конфигурация, клиент backend
-│   │   ├── routes/           # Маршруты (site, api)
-│   │   ├── static/           # CSS, JS
-│   │   ├── templates/        # HTML-шаблоны (base, index, task)
-│   │   └── __init__.py, main.py
+├── deploy
+│   ├── docker-compose.app.yml          # Сервисы приложения (backend, web, worker)
+│   ├── docker-compose.infra.yml        # Инфраструктурные сервисы (MongoDB, Redis, MinIO)
+│   └── docker-compose.yml              # Основной compose, объединяющий оба
+├── docs
+│   ├── README-en.md
+│   └── tz.md
+├── Makefile
+├── README.md
+├── requirements-dev.txt
+├── requirements.txt
+├── web
+│   ├── app
+│   │   ├── __init__.py
+│   │   ├── core
+│   │   │   ├── auth.py                 # Проверка токена для web-прокси
+│   │   │   ├── backend_client.py       # Клиент для вызовов backend API
+│   │   │   └── config.py               # Настройки Flask
+│   │   ├── error_handlers.py           # Обработчики ошибок
+│   │   ├── main.py                     # Точка входа Flask
+│   │   ├── routes
+│   │   │   ├── api.py                  # Прокси-маршруты к backend API
+│   │   │   ├── auth.py                 # Маршруты аутентификации (логин, регистрация, выход)
+│   │   │   └── site.py                 # Основные веб-страницы (главная, задача, список задач)
+│   │   ├── static
+│   │   │   ├── css
+│   │   │   │   └── style.css
+│   │   │   └── js
+│   │   │       └── task.js             # Клиентский JS для страницы задачи (SSE, метрики, логи)
+│   │   └── templates
+│   │       ├── base.html               # Базовый шаблон (Bootstrap 5, навигация)
+│   │       ├── error.html              # Страница ошибки
+│   │       ├── index.html              # Форма отправки кода
+│   │       ├── login.html              # Страница входа
+│   │       ├── register.html           # Страница регистрации
+│   │       └── task.html               # Детальная страница задачи
 │   ├── Dockerfile
+│   ├── README.md
 │   └── requirements.txt
-├── worker/                   # Воркер (выполнение задач)
-│   ├── app/
-│   │   ├── core/             # Конфигурация, Docker, MinIO, MongoDB
-│   │   ├── tasks.py          # Логика выполнения
-│   │   └── worker.py         # Точка входа для rq
-│   ├── Dockerfile
-│   └── requirements.txt
-├── deploy/                   # Конфигурации развёртывания
-│   ├── docker-compose.yml    # Общий compose-файл (всё вместе)
-│   ├── docker-compose.app.yml  # Только приложения (backend, web, worker)
-│   └── docker-compose.infra.yml # Только инфраструктура (MongoDB, Redis, MinIO)
-├── Makefile                  # Утилиты для сборки, запуска, тестирования
-├── requirements-dev.txt      # Зависимости для разработки
-└── README.md                 # Общая документация
+└── worker
+    ├── app
+    │   ├── core
+    │   │   ├── config.py               # Настройки воркера
+    │   │   ├── docker_client.py        # Инициализация Docker клиента
+    │   │   ├── minio_client.py         # Клиент MinIO
+    │   │   └── mongo.py                # Подключение к MongoDB
+    │   ├── tasks.py                    # Функция выполнения задачи (run_task)
+    │   └── worker.py                   # Точка входа для rq worker
+    ├── Dockerfile
+    ├── README.md
+    └── requirements.txt
 ```
 
-**Функции составных частей:**
+#### Функции составных частей
 
-- **Backend (FastAPI)**: предоставляет REST API для управления задачами, аутентификацию, проверку прав доступа, уведомления SSE.
-- **Worker (Python)**: выполняет задачи в Docker-контейнерах, собирает логи и метрики, сохраняет результаты в MinIO и MongoDB.
-- **Web (Flask)**: отображает интерфейс, проксирует запросы к backend, управляет сессиями (через JWT в куках).
-- **Docker Compose**: оркестрирует запуск всех сервисов в контейнерах.
-- **Makefile**: упрощает сборку, запуск, тестирование (например, `make up`, `make test`).
+- **Backend (FastAPI):**
+  - `api/auth.py` – регистрация, получение JWT-токена.
+  - `api/tasks.py` – создание, просмотр, список задач, логи, метрики, SSE-поток.
+  - `core/` – конфигурация, подключения к БД, Redis, MinIO, безопасность.
+  - `middleware/logging.py` – логирование всех входящих запросов.
+  - `models/` – Pydantic-модели для валидации.
+  - `services/` – бизнес-логика, разделяющая задачи и пользователей.
 
-**Связи программы с другими программами:**
+- **Worker (Python):**
+  - `tasks.py` – функция `run_task`, которая создаёт и запускает контейнер, собирает статистику, загружает логи в MinIO, обновляет статус в MongoDB.
+  - `worker.py` – запускает rq worker, который слушает Redis-очередь и вызывает `run_task`.
+
+- **Web (Flask):**
+  - `routes/site.py` – основные страницы: главная (`/`), страница задачи (`/<task_id>`), список задач (`/tasks`).
+  - `routes/auth.py` – страницы логина, регистрации, выхода, проксирование к backend.
+  - `routes/api.py` – прокси-маршруты для вызовов к backend API (добавляет JWT из сессии).
+  - `core/backend_client.py` – инкапсулирует вызовы к backend.
+  - `core/auth.py` – проверка наличия токена в сессии.
+  - `error_handlers.py` – обработка ошибок 404, 500 и т.д.
+  - `templates/` – Jinja2-шаблоны с Bootstrap 5, CodeMirror, Chart.js.
+  - `static/js/task.js` – клиентский код для SSE, отображения логов, метрик.
+
+- **Deploy:**
+  - `docker-compose.infra.yml` – запуск MongoDB, Redis, MinIO.
+  - `docker-compose.app.yml` – запуск backend, web, worker.
+  - `docker-compose.yml` – объединяет оба, упрощая локальный запуск.
+
+#### Связи программы с другими программами
 
 - **Docker Engine** – для запуска изолированных контейнеров
 - **MongoDB** – хранение метаданных задач и пользователей
@@ -182,7 +245,7 @@ docker-compose -f deploy/docker-compose.yml up --build
 **Входные точки в программу:**
 
 - Веб-интерфейс: `http://localhost:5000`
-- Backend API: `http://localhost:8000/api/v1`
+- Backend API: `http://localhost:8000/api`
 - Документация API (Swagger): `http://localhost:8000/docs`
 - MinIO Console: `http://localhost:9001` (логин/пароль: minioadmin/minioadmin)
 
@@ -322,19 +385,19 @@ docker-compose -f deploy/docker-compose.yml up --build
 
 | Метод  | Endpoint               | Описание                          |
 |--------|------------------------|-----------------------------------|
-| `POST` | `/api/v1/auth/register`| Регистрация нового пользователя   |
-| `POST` | `/api/v1/auth/token`   | Получение JWT-токена              |
+| `POST` | `/api/auth/register`| Регистрация нового пользователя   |
+| `POST` | `/api/auth/token`   | Получение JWT-токена              |
 
 **Управление задачами**
 
 | Метод   | Endpoint                     | Описание                                   |
 |---------|------------------------------|--------------------------------------------|
-| `POST`  | `/api/v1/tasks`              | Создание новой задачи (требует JWT)        |
-| `GET`   | `/api/v1/tasks/{task_id}`    | Получение деталей задачи                   |
-| `GET`   | `/api/v1/tasks`              | Список задач пользователя (пагинация)      |
-| `GET`   | `/api/v1/tasks/{task_id}/logs`  | Получение presigned URL для логов          |
-| `GET`   | `/api/v1/tasks/{task_id}/metrics`| Получение метрик выполнения                |
-| `GET`   | `/api/v1/tasks/{task_id}/stream` | SSE поток статуса задачи                   |
+| `POST`  | `/api/tasks`              | Создание новой задачи (требует JWT)        |
+| `GET`   | `/api/tasks/{task_id}`    | Получение деталей задачи                   |
+| `GET`   | `/api/tasks`              | Список задач пользователя (пагинация)      |
+| `GET`   | `/api/tasks/{task_id}/logs`  | Получение presigned URL для логов          |
+| `GET`   | `/api/tasks/{task_id}/metrics`| Получение метрик выполнения                |
+| `GET`   | `/api/tasks/{task_id}/stream` | SSE поток статуса задачи                   |
 
 **Пример использования API**
 
@@ -346,7 +409,7 @@ login_data = {
     "username": "user",
     "password": "pass"
 }
-response = requests.post("http://localhost:8000/api/v1/auth/token", data=login_data)
+response = requests.post("http://localhost:8000/api/auth/token", data=login_data)
 token = response.json()["access_token"]
 
 headers = {"Authorization": f"Bearer {token}"}
@@ -359,11 +422,11 @@ task_data = {
     "memory_limit": "128m",
     "timeout": 10
 }
-response = requests.post("http://localhost:8000/api/v1/tasks", json=task_data, headers=headers)
+response = requests.post("http://localhost:8000/api/tasks", json=task_data, headers=headers)
 task_id = response.json()["task_id"]
 
 # Получение статуса
-status = requests.get(f"http://localhost:8000/api/v1/tasks/{task_id}", headers=headers)
+status = requests.get(f"http://localhost:8000/api/tasks/{task_id}", headers=headers)
 print(status.json())
 ```
 
@@ -438,3 +501,4 @@ pytest tests/integration -v
 ### Лицензия
 
 MIT License
+
