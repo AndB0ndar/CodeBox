@@ -1,166 +1,440 @@
-# Task Runner Service
+## Документация проекта "CodeBox"
 
-A secure, containerized code execution service with real-time monitoring and resource isolation.
-Run arbitrary code in isolated Docker containers, collect logs and metrics, and stream status updates via Server-Sent Events.
+### Общие сведения
 
-## Features
+**Обозначение и наименование программы:** CodeBox  
+**Версия:** 0.1
+**Класс программного обеспечения:** Веб-приложение для безопасного удалённого выполнения пользовательского кода в изолированных Docker‑контейнерах
 
-- **Isolated execution** – each task runs in a fresh Docker container with strict resource limits (CPU, memory, timeout).
-- **Multiple languages** – Python, JavaScript (Node.js), Bash (easily extensible).
-- **Real-time updates** – task status streamed via SSE, no polling needed.
-- **Logs & Metrics** – stdout/stderr saved to MinIO, CPU/memory usage collected and displayed.
-- **REST API** – create tasks, retrieve status, logs, and metrics.
-- **Web UI** – simple interface to submit code and monitor execution.
-- **Security** – containers run with read‑only rootfs, no privileges, dropped capabilities, and disabled network (optional).
+- Python 3.10 или выше
+- Docker 20.10+
+- FastAPI 0.104+
+- Flask 2.3+
+- MongoDB 6+
+- Redis 7+
+- MinIO 2023+
+- Зависимости из соответствующих `requirements.txt` (backend, worker, web)
 
-## Architecture
+**Языки программирования:**
 
-The system consists of four main components:
+- Backend: Python (FastAPI)
+- Worker: Python
+- Frontend: JavaScript, HTML5, CSS3 (Bootstrap 5)
 
-- **Backend (FastAPI)** – handles task creation, stores tasks in MongoDB, pushes tasks to Redis queue.
-- **Worker (Python + RQ)** – pulls tasks from Redis, executes them in Docker, collects logs and metrics, updates MongoDB, and publishes status updates via Redis Pub/Sub.
-- **Web (Flask)** – provides a user interface and proxies API requests to the backend.
-- **Infrastructure** – MongoDB (data), Redis (queue + pub/sub), MinIO (log storage).
+### Функциональное назначение
 
-```
-User → Web UI → Backend → Redis Queue → Worker → Docker
-          ↑                      ↓
-          └────── SSE stream ←───┘
-```
+**Классы решаемых задач:**
 
-## Technology Stack
+- Удалённое выполнение кода на различных языках (Python, JavaScript, Bash)
+- Изолированное исполнение в Docker‑контейнерах с ограничением ресурсов (CPU, память, таймаут)
+- Сбор логов выполнения и метрик производительности (максимальные и средние значения)
+- Управление очередью задач через Redis
+- Хранение результатов в объектном хранилище MinIO
+- Аутентификация пользователей с помощью JWT
+- Ограничение количества запросов и одновременных задач на пользователя
 
-- **Backend**: FastAPI, Motor (async MongoDB), RQ (Redis Queue), aioredis, SSE-Starlette
-- **Worker**: Python, Docker SDK, RQ, pymongo, minio-py
-- **Web**: Flask, Jinja2, requests, JavaScript (SSE client)
-- **Database**: MongoDB
-- **Queue & Pub/Sub**: Redis
-- **Object Storage**: MinIO
-- **Containerization**: Docker, Docker Compose
+**Назначение программы:** Профессиональная платформа для безопасного выполнения пользовательского кода в контролируемом окружении с возможностью мониторинга, сбора логов и метрик.
 
-## Prerequisites
+**Функциональные ограничения на применение:**
 
-- Docker and Docker Compose installed
-- Git
+- Максимальный размер кода: 10 МБ (настраивается)
+- Максимальное время выполнения задачи: до 300 секунд (по умолчанию 30, настраивается пользователем)
+- Ограничение на использование CPU и памяти задаётся пользователем
+- Длительность сессии: 30 минут (JWT‑токен)
 
-## Quick Start
+### Описание логической структуры
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/task-runner.git
-   cd task-runner
-   ```
+**Алгоритм программы:**
 
-2. Copy environment example files:
-   ```bash
-   cp backend/.env.example backend/.env
-   cp worker/.env.example worker/.env
-   cp web/.env.example web/.env
-   ```
-   (Default values work out-of-the-box.)
+1. **Аутентификация** – пользователь вводит логин/пароль, получает JWT-токен
+2. **Создание задачи** – пользователь отправляет код с параметрами (язык, CPU, память, таймаут)
+3. **Постановка в очередь** – задача сохраняется в MongoDB и помещается в Redis-очередь
+4. **Выполнение** – воркер забирает задачу, запускает Docker-контейнер с ограничениями
+5. **Сбор логов** – stdout/stderr контейнера сохраняются в MinIO
+6. **Сбор метрик** – каждую секунду собираются показатели CPU, памяти
+7. **Уведомления** – через Redis Pub/Sub клиент получает обновления статуса в реальном времени (SSE)
+8. **Результаты** – логи и метрики доступны через API и веб-интерфейс
 
-3. Start all services:
-   ```bash
-   docker-compose -f docker/docker-compose.yml up --build -d
-   ```
-   or
-   ```bash
-   make up
-   ```
+**Используемые методы:**
 
-4. Access the web UI at [http://localhost:5000](http://localhost:5000)
+- Микросервисная архитектура с разделением на backend, worker, web
+- REST API (FastAPI) с автоматической документацией (Swagger)
+- Асинхронная обработка через Redis (RQ)
+- Docker SDK для управления контейнерами
+- MinIO для объектного хранения логов
+- JWT-аутентификация с истечением токена
+- Rate limiting на уровне API и веб-интерфейса
 
-5. MinIO console: [http://localhost:9001](http://localhost:9001) (login: `minioadmin` / `minioadmin`)
-
-## Usage
-
-### Web Interface
-
-- Open `http://localhost:5000`
-- Select language, paste your code, set resource limits, and click "Run".
-- You will be redirected to the task page where status updates appear instantly (via SSE).
-- After completion, logs and resource metrics are displayed.
-
-### REST API
-
-The backend exposes a REST API on port `8000`.  
-Example endpoints:
-
-- `POST /api/tasks` – create a new task  
-  Body:
-  ```json
-  {
-    "code": "print('hello')",
-    "language": "python",
-    "cpu_limit": 1.0,
-    "memory_limit": "256m",
-    "timeout": 30
-  }
-  ```
-  Response: `{ "task_id": "uuid" }`
-
-- `GET /api/tasks/{task_id}` – get task details
-- `GET /api/tasks/{task_id}/logs` – get a presigned URL for logs stored in MinIO
-- `GET /api/tasks/{task_id}/metrics` – get execution metrics (CPU, memory)
-- `GET /api/tasks/{task_id}/stream` – SSE stream for real‑time status updates
-- `GET /api/tasks` – list tasks (with `?limit=`)
-
-## Testing
-
-Run unit and integration tests with pytest (inside a dedicated virtual environment or directly if dependencies are installed).
-
-```bash
-pip install -r requirements-dev.txt   # pytest, mongomock, mockredis, etc.
-pytest tests/ -v
-```
-
-The test suite mocks external services (MongoDB, Redis, Docker, MinIO) so no actual containers are required.
-
-## Project Structure
+**Структура программы:**
 
 ```
 .
-├── backend/           # FastAPI application
-├── web/               # Flask web UI
-├── worker/            # RQ worker that runs Docker containers
-├── tests/             # Unit and integration tests
-├── docker/            # Compose files
-└── README.md
+├── backend/                  # Backend-сервер (FastAPI)
+│   ├── app/
+│   │   ├── api/              # Эндпоинты (dependencies, tasks)
+│   │   ├── core/             # Конфигурация, БД, MinIO, Redis Pub/Sub
+│   │   ├── middleware/       # Промежуточное ПО (логирование)
+│   │   ├── models/           # Модели данных (task)
+│   │   ├── services/         # Бизнес-логика (task_service)
+│   │   └── main.py           # Точка входа
+│   ├── Dockerfile
+│   └── requirements.txt
+├── web/                      # Веб-сервер (Flask)
+│   ├── app/
+│   │   ├── core/             # Конфигурация, клиент backend
+│   │   ├── routes/           # Маршруты (site, api)
+│   │   ├── static/           # CSS, JS
+│   │   ├── templates/        # HTML-шаблоны (base, index, task)
+│   │   └── __init__.py, main.py
+│   ├── Dockerfile
+│   └── requirements.txt
+├── worker/                   # Воркер (выполнение задач)
+│   ├── app/
+│   │   ├── core/             # Конфигурация, Docker, MinIO, MongoDB
+│   │   ├── tasks.py          # Логика выполнения
+│   │   └── worker.py         # Точка входа для rq
+│   ├── Dockerfile
+│   └── requirements.txt
+├── deploy/                   # Конфигурации развёртывания
+│   ├── docker-compose.yml    # Общий compose-файл (всё вместе)
+│   ├── docker-compose.app.yml  # Только приложения (backend, web, worker)
+│   └── docker-compose.infra.yml # Только инфраструктура (MongoDB, Redis, MinIO)
+├── Makefile                  # Утилиты для сборки, запуска, тестирования
+├── requirements-dev.txt      # Зависимости для разработки
+└── README.md                 # Общая документация
 ```
 
-## Configuration
+**Функции составных частей:**
 
-Each service reads configuration from environment variables.  
-See the respective `.env.example` files for all options.
+- **Backend (FastAPI)**: предоставляет REST API для управления задачами, аутентификацию, проверку прав доступа, уведомления SSE.
+- **Worker (Python)**: выполняет задачи в Docker-контейнерах, собирает логи и метрики, сохраняет результаты в MinIO и MongoDB.
+- **Web (Flask)**: отображает интерфейс, проксирует запросы к backend, управляет сессиями (через JWT в куках).
+- **Docker Compose**: оркестрирует запуск всех сервисов в контейнерах.
+- **Makefile**: упрощает сборку, запуск, тестирование (например, `make up`, `make test`).
 
-- `MONGO_URI`, `MONGO_DB_NAME`
-- `REDIS_URL`
-- `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET`
-- `BACKEND_URL` (for web service)
-- `SECRET_KEY` (for Flask)
-- `DOCKER_HOST` (for worker, usually unix socket)
+**Связи программы с другими программами:**
 
-## Security Considerations
+- **Docker Engine** – для запуска изолированных контейнеров
+- **MongoDB** – хранение метаданных задач и пользователей
+- **Redis** – очередь задач и Pub/Sub для уведомлений
+- **MinIO** – объектное хранилище логов
+- **Веб-браузеры** – для работы с интерфейсом
 
-- Containers are created with:
-  - `read_only=true` (root filesystem read‑only, except `/tmp` as tmpfs)
-  - `cap_drop=ALL` (no Linux capabilities)
-  - `security_opt=no-new-privileges:true`
-  - `network_disabled=true` (network disabled by default – can be overridden)
-  - CPU, memory, and PID limits
-  - Automatic removal after execution
-- All inter‑service communication is internal (Docker network).  
-- Logs are stored in MinIO and can be accessed only via presigned URLs (short‑lived).
+### Используемые технические средства
 
-## Future Enhancements
+**Типы электронных вычислительных машин и устройств:**
 
-- Support for uploading archives (multiple files, dependencies)
-- WebSocket for even lower latency updates
-- Persistent storage of metrics for historical analysis (Prometheus/Grafana)
-- Kubernetes deployment manifests
-- User authentication and quotas
+- Серверные платформы: x86-64 архитектура
+- Минимальный объем ОЗУ: 2 ГБ (рекомендуется 4 ГБ)
+- Минимальный объем дискового пространства: 10 ГБ (для хранения задач и логов)
+- Сетевые адаптеры: Ethernet 100/1000 Мбит/с
 
-## License
+**Минимальные требования:**
 
-MIT
+- Процессор: 1 ГГц или выше
+- Оперативная память: 2 ГБ
+- Свободное место на диске: 10 ГБ
+- Docker Engine 20.10+
+- Сетевое подключение для доступа к MinIO, Redis, MongoDB
 
+**Рекомендуемые требования:**
+
+- Процессор: 2 ГГц (многоядерный)
+- Оперативная память: 4 ГБ или больше
+- Свободное место на диске: 50 ГБ (для хранения логов)
+- Высокоскоростное сетевое подключение
+
+**Поддерживаемые платформы:**
+
+- Linux (Ubuntu 20.04+, Debian 11+, CentOS 8+)
+- Windows 10/11 (с WSL2 и Docker Desktop)
+- macOS 11+ (с Docker Desktop)
+
+**Программное окружение:**
+
+- Веб-сервер: Uvicorn (backend), Flask development server (web в разработке), Gunicorn (продакшен)
+- База данных: MongoDB 6+
+- Очередь: Redis 7+
+- Объектное хранилище: MinIO 2023+
+- Браузер: Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
+
+### Вызов и загрузка
+
+**Способ вызова программы:**
+
+```bash
+# Клонирование репозитория
+git clone https://github.com/your-org/task-runner.git
+cd task-runner
+
+# Создание .env файлов для каждого сервиса
+cp backend/.env.example backend/.env
+cp web/.env.example web/.env
+cp worker/.env.example worker/.env
+
+# Запуск всех сервисов через Docker Compose (используя Makefile)
+make up
+
+# Или вручную:
+docker-compose -f deploy/docker-compose.yml up --build
+```
+
+**Входные точки в программу:**
+
+- Веб-интерфейс: `http://localhost:5000`
+- Backend API: `http://localhost:8000/api/v1`
+- Документация API (Swagger): `http://localhost:8000/docs`
+- MinIO Console: `http://localhost:9001` (логин/пароль: minioadmin/minioadmin)
+
+**Использование оперативной памяти:**
+
+- Базовое потребление всех сервисов: ~500-700 МБ
+- При активной обработке задач (воркер): дополнительно до 500 МБ на задачу
+- MongoDB и Redis могут использовать до 1 ГБ при большом количестве задач
+
+**Объем программы:** ~50 МБ (исходный код + зависимости)
+
+### Входные данные
+
+**Характер и организация:**
+
+- Код на языках: Python, JavaScript (Node.js), Bash (другие могут быть добавлены)
+- Параметры выполнения: CPU (ядра), память (строка, например "256m"), таймаут (секунды)
+- Код передаётся как текст в теле POST-запроса или через веб-форму
+
+**Формат и описание входных данных:**
+
+```json
+{
+  "code": "print('Hello, World!')",
+  "language": "python",
+  "cpu_limit": 1.0,
+  "memory_limit": "256m",
+  "timeout": 30
+}
+```
+
+**Способ кодирования:** UTF-8
+
+**Требования к входным данным:**
+
+- Код не должен содержать вредоносных инструкций (ограничения на уровне контейнера)
+- Максимальный размер кода: 10 МБ
+- Язык должен быть в списке поддерживаемых (python, javascript, bash)
+
+### Выходные данные
+
+**Характер и организация:**
+
+- Логи выполнения (stdout/stderr) сохраняются в MinIO и доступны по presigned URL
+- Метрики использования CPU и памяти (максимальные и средние значения) возвращаются в JSON
+- Код возврата завершения контейнера (0 – успех, ненулевой – ошибка)
+- Статус задачи (queued, running, completed, failed, timeout)
+
+**Формат и описание:**
+
+- Логи: текстовый файл, доступный через presigned ссылку
+- Метрики:
+
+```json
+{
+  "max_cpu": 45.2,
+  "avg_cpu": 12.8,
+  "max_memory": 123456789,
+  "avg_memory": 98765432
+}
+```
+
+**Способ кодирования:** UTF-8 для логов, JSON для API ответов
+
+### Установка и настройка
+
+**Предварительные требования**
+
+- Python 3.10+
+- Docker и Docker Compose
+- Git
+
+**Установка**
+
+```bash
+git clone https://github.com/your-org/task-runner.git
+cd task-runner
+```
+
+**Конфигурация**
+
+Создайте `.env` файлы для каждого сервиса, отредактировав примеры:
+
+- `backend/.env`
+- `web/.env`
+- `worker/.env`
+
+Основные переменные:
+
+```
+# backend/.env
+MONGO_URI=mongodb://mongodb:27017
+REDIS_URL=redis://redis:6379
+SECRET_KEY=your-secret-key-here
+MINIO_ENDPOINT=minio:9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+MINIO_BUCKET=task-logs
+```
+
+**Запуск**
+
+```bash
+# Используя Makefile
+make up
+
+# Или вручную:
+docker-compose -f deploy/docker-compose.yml up --build
+```
+
+После запуска:
+
+- Веб-интерфейс: http://localhost:5000
+- Backend API: http://localhost:8000
+- MinIO Console: http://localhost:9001 (логин/пароль minioadmin)
+
+### Использование
+
+**Основной workflow**
+
+1. **Регистрация** – перейдите на http://localhost:5000/register, создайте учётную запись
+2. **Вход** – войдите под своими данными
+3. **Создание задачи** – на главной странице выберите язык, введите код, установите ограничения и нажмите "Запустить"
+4. **Мониторинг** – на странице задачи статус обновляется в реальном времени, логи и метрики появляются после завершения
+5. **Просмотр истории** – перейдите в раздел "Мои задачи", чтобы увидеть список всех созданных задач
+
+**Веб-интерфейс**
+
+- **Главная страница** – форма отправки кода с редактором (CodeMirror)
+- **Страница задачи** – отображение статуса, кода, логов, метрик (вкладки)
+- **Мои задачи** – таблица с историей задач, фильтрация по статусу
+- **Аутентификация** – страницы регистрации и входа
+
+### API Endpoints
+
+**Аутентификация**
+
+| Метод  | Endpoint               | Описание                          |
+|--------|------------------------|-----------------------------------|
+| `POST` | `/api/v1/auth/register`| Регистрация нового пользователя   |
+| `POST` | `/api/v1/auth/token`   | Получение JWT-токена              |
+
+**Управление задачами**
+
+| Метод   | Endpoint                     | Описание                                   |
+|---------|------------------------------|--------------------------------------------|
+| `POST`  | `/api/v1/tasks`              | Создание новой задачи (требует JWT)        |
+| `GET`   | `/api/v1/tasks/{task_id}`    | Получение деталей задачи                   |
+| `GET`   | `/api/v1/tasks`              | Список задач пользователя (пагинация)      |
+| `GET`   | `/api/v1/tasks/{task_id}/logs`  | Получение presigned URL для логов          |
+| `GET`   | `/api/v1/tasks/{task_id}/metrics`| Получение метрик выполнения                |
+| `GET`   | `/api/v1/tasks/{task_id}/stream` | SSE поток статуса задачи                   |
+
+**Пример использования API**
+
+```python
+import requests
+
+# Получение токена
+login_data = {
+    "username": "user",
+    "password": "pass"
+}
+response = requests.post("http://localhost:8000/api/v1/auth/token", data=login_data)
+token = response.json()["access_token"]
+
+headers = {"Authorization": f"Bearer {token}"}
+
+# Создание задачи
+task_data = {
+    "code": "print('Hello')",
+    "language": "python",
+    "cpu_limit": 0.5,
+    "memory_limit": "128m",
+    "timeout": 10
+}
+response = requests.post("http://localhost:8000/api/v1/tasks", json=task_data, headers=headers)
+task_id = response.json()["task_id"]
+
+# Получение статуса
+status = requests.get(f"http://localhost:8000/api/v1/tasks/{task_id}", headers=headers)
+print(status.json())
+```
+
+### Система безопасности
+
+**Аутентификация:**
+
+- JWT-токены с истечением через 30 минут
+- Пароли хранятся в хешированном виде (bcrypt)
+- Обязательная авторизация для доступа к защищённым эндпоинтам
+
+**Контроль доступа:**
+
+- Пользователь может видеть и управлять только своими задачами (кроме администраторов)
+- Проверка прав при каждом запросе (владелец задачи или admin)
+
+**Ограничение ресурсов:**
+
+- Rate limiting на уровне API: 5 запросов в минуту на создание задачи, 60 запросов в минуту на чтение
+- Квоты пользователя: максимум 3 одновременных задачи, ограничения на CPU/память/таймаут
+- Docker-контейнеры запускаются с `read_only`, отключёнными capabilities, отключённой сетью (по умолчанию), лимитами на процессы и файлы
+
+**Валидация входных данных:**
+
+- Проверка языка (только поддерживаемые)
+- Проверка лимитов CPU/памяти/таймаута на соответствие квотам пользователя
+- Ограничение размера кода (10 МБ)
+
+**Изоляция:**
+
+- Каждый контейнер запускается с ограничениями ресурсов и без привилегий
+- Использование `tmpfs` для `/tmp` для предотвращения записи на диск хоста
+- Отключение сети (можно разрешить по необходимости)
+- Удаление контейнера после выполнения (даже при ошибках)
+
+### Тестирование
+
+```bash
+# Установка зависимостей для тестирования
+pip install -r requirements-dev.txt
+
+# Запуск unit-тестов (с моками)
+pytest tests/unit -v
+
+# Запуск всех тестов с покрытием
+pytest tests/ --cov=backend --cov=worker --cov=web --cov-report=html
+
+# Интеграционные тесты (требуют запущенных сервисов)
+pytest tests/integration -v
+```
+
+### Конфигурация
+
+**Режимы работы (через переменные окружения)**
+
+- `FLASK_CONFIG` для web-сервера (development, production)
+- Для backend настройка через `.env`
+
+**Переменные окружения (основные)**
+
+| Переменная            | По умолчанию               | Описание                              |
+|-----------------------|----------------------------|---------------------------------------|
+| `MONGO_URI`           | `mongodb://localhost:27017`| URL подключения к MongoDB              |
+| `REDIS_URL`           | `redis://localhost:6379`   | URL подключения к Redis                |
+| `MINIO_ENDPOINT`      | `localhost:9000`           | Адрес MinIO                           |
+| `MINIO_ACCESS_KEY`    | `minioadmin`               | Ключ доступа MinIO                     |
+| `MINIO_SECRET_KEY`    | `minioadmin`               | Секретный ключ MinIO                   |
+| `SECRET_KEY`          | -                          | Секретный ключ для JWT                 |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `30`                | Время жизни JWT-токена                 |
+| `MAX_CODE_SIZE`       | `10485760`                 | Максимальный размер кода (10 МБ)       |
+
+### Лицензия
+
+MIT License
