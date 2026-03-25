@@ -6,9 +6,12 @@ from typing import List
 from fastapi.responses import StreamingResponse
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
 
+from app.main import limiter
 from app.models.task import TaskCreate, TaskInDB
-from app.api.dependencies import get_task_service
+from app.models.user import UserInDB
+from app.api.dependencies import get_task_service, get_current_active_user
 from app.services.task_service import TaskService
+
 
 logger = logging.getLogger(__name__)
 
@@ -22,13 +25,23 @@ router = APIRouter()
     description="Enqueue a task for execution. Returns the task ID immediately.",
     response_description="Task ID",
 )
+@limiter.limit("5/minute")
 async def create_task(
+    request: Request,
     task: TaskCreate,
+    current_user: UserInDB = Depends(get_current_active_user),
     service: TaskService = Depends(get_task_service),
 ):
-    """Create a task and add it to the queue."""
-    task_id = await service.create_task(task)
+    """Create a task and add it to the queue, with user quota checks."""
+    try:
+        task_id = await service.create_task(current_user["_id"], task)
+    except ValueError as e:
+        raise HTTPException(status_code=400 if "exceeds quota" in str(e) or "Too many concurrent" in str(e) else 400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Task creation failed: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
     return {"task_id": task_id}
+
 
 
 @router.get(
@@ -36,17 +49,30 @@ async def create_task(
     response_model=TaskInDB,
     summary="Get task details",
     description="Retrieve a task document by its ID.",
-    responses={404: {"description": "Task not found"}},
+    responses={
+        404: {"description": "Task not found"},
+        403: {"description": "Not authorized to view this task"},
+    },
 )
+@limiter.limit("5/minute")
 async def get_task(
+    request: Request,
     task_id: str,
+    current_user: UserInDB = Depends(get_current_active_user),
     service: TaskService = Depends(get_task_service),
 ):
-    """Fetch a single task from MongoDB."""
-    task = await service.get_task(task_id)
+    """Fetch a single task from MongoDB, with authorization."""
+    task = await service.get_task(
+        task_id,
+        user_id=current_user["_id"],
+        is_admin=current_user.get("is_admin", False)
+    )
     if not task:
-        logger.warning(f"Task not found: {task_id}")
-        raise HTTPException(status_code=404, detail="Task not found")
+        exists = await service.get_task(task_id)
+        if not exists:
+            raise HTTPException(status_code=404, detail="Task not found")
+        else:
+            raise HTTPException(status_code=403, detail="Not authorized to view this task")
     return task
 
 
@@ -56,18 +82,19 @@ async def get_task(
     summary="List tasks",
     description="Return a list of recent tasks, sorted by creation date descending.",
 )
+@limiter.limit("5/minute")
 async def list_tasks(
-    limit: int = Query(
-        10,
-        ge=1,
-        le=100,
-        description="Maximum number of tasks to return",
-        examples=[5, 10, 20],
-    ),
+    request: Request,
+    limit: int = Query(10, ge=1, le=100, description="Maximum number of tasks to return"),
+    current_user: UserInDB = Depends(get_current_active_user),
     service: TaskService = Depends(get_task_service),
 ):
-    """Fetch the most recent tasks."""
-    tasks = await service.list_tasks(limit)
+    """Fetch tasks with user-based filtering."""
+    tasks = await service.list_tasks(
+        user_id=current_user["_id"],
+        is_admin=current_user.get("is_admin", False),
+        limit=limit
+    )
     return tasks
 
 
@@ -77,26 +104,42 @@ async def list_tasks(
     description="Generate a pre‑signed URL to download the task logs from MinIO.",
     responses={
         404: {"description": "Task or logs not found"},
+        403: {"description": "Not authorized"},
         500: {"description": "MinIO error"},
     },
 )
+@limiter.limit("5/minute")
 async def get_task_logs(
+    request: Request,
     task_id: str,
+    current_user: UserInDB = Depends(get_current_active_user),
     service: TaskService = Depends(get_task_service),
 ):
     """Return a temporary URL (valid for 5 minutes) for logs."""
     try:
-        url = await service.get_task_logs_url(task_id)
+        url = await service.get_task_logs_url(
+            task_id,
+            user_id=current_user["_id"],
+            is_admin=current_user.get("is_admin", False)
+        )
     except Exception as e:
         logger.error(f"MinIO error for task {task_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to generate logs URL")
 
     if url is None:
-        # Distinguish between task not found and logs not available
-        task = await service.get_task(task_id)
+        task = await service.get_task(
+            task_id,
+            user_id=current_user["_id"],
+            is_admin=current_user.get("is_admin", False)
+        )
         if not task:
-            raise HTTPException(status_code=404, detail="Task not found")
-        raise HTTPException(status_code=404, detail="Logs not available yet")
+            exists = await service.get_task(task_id)
+            if not exists:
+                raise HTTPException(status_code=404, detail="Task not found")
+            else:
+                raise HTTPException(status_code=403, detail="Not authorized")
+        else:
+            raise HTTPException(status_code=404, detail="Logs not available yet")
 
     return {"url": url}
 
@@ -105,32 +148,55 @@ async def get_task_logs(
     "/{task_id}/metrics",
     summary="Get task metrics",
     description="Retrieve execution metrics (CPU, memory, etc.) for a completed task.",
-    responses={404: {"description": "Task or metrics not found"}},
+    responses={
+        404: {"description": "Task or metrics not found"},
+        403: {"description": "Not authorized"},
+    },
 )
+@limiter.limit("5/minute")
 async def get_task_metrics(
+    request: Request,
     task_id: str,
+    current_user: UserInDB = Depends(get_current_active_user),
     service: TaskService = Depends(get_task_service),
 ):
     """Return the metrics object stored with the task."""
-    metrics = await service.get_task_metrics(task_id)
+    metrics = await service.get_task_metrics(
+        task_id,
+        user_id=current_user["_id"],
+        is_admin=current_user.get("is_admin", False)
+    )
     if metrics is None:
-        task = await service.get_task(task_id)
+        # Проверяем доступность задачи
+        task = await service.get_task(
+            task_id,
+            user_id=current_user["_id"],
+            is_admin=current_user.get("is_admin", False)
+        )
         if not task:
-            raise HTTPException(status_code=404, detail="Task not found")
-        raise HTTPException(status_code=404, detail="Metrics not available")
+            exists = await service.get_task(task_id)
+            if not exists:
+                raise HTTPException(status_code=404, detail="Task not found")
+            else:
+                raise HTTPException(status_code=403, detail="Not authorized")
+        else:
+            raise HTTPException(status_code=404, detail="Metrics not available")
     return metrics
 
 
-async def _stream_wrapper(request: Request, service: TaskService, task_id: str):
-    """
-    Wraps the service's status_event_generator to format SSE and handle client disconnection.
-    """
+async def _stream_wrapper(
+    request: Request,
+    service: TaskService,
+    task_id: str,
+    user_id: str,
+    is_admin: bool
+):
+    """Wrapper for SSE generator that includes user context."""
     try:
-        async for event in service.status_event_generator(task_id):
+        async for event in service.status_event_generator(task_id, user_id, is_admin):
             if await request.is_disconnected():
                 logger.debug(f"Client disconnected from stream {task_id}")
                 break
-
             if "event" in event:
                 yield f"event: {event['event']}\ndata: {json.dumps(event['data'])}\n\n"
             else:
@@ -148,32 +214,38 @@ async def _stream_wrapper(request: Request, service: TaskService, task_id: str):
     Events are `data` (status update) and `done` (task finished).
     """,
     responses={
-        200: {
-            "description": "Server‑Sent Events stream",
-            "content": {"text/event-stream": {}},
-        },
+        200: {"description": "Server‑Sent Events stream", "content": {"text/event-stream": {}}},
         404: {"description": "Task not found"},
+        403: {"description": "Not authorized"},
     },
 )
 async def stream_task_status(
     request: Request,
     task_id: str,
+    current_user: UserInDB = Depends(get_current_active_user),
     service: TaskService = Depends(get_task_service),
 ):
-    """Subscribe to Redis pub/sub and stream task status updates."""
-    # Quick check that task exists
-    # (service generator will also check, but we want early 404)
-    task = await service.get_task(task_id)
+    """Subscribe to Redis pub/sub and stream task status updates with authorization."""
+    # Проверка существования и доступа перед началом стрима
+    task = await service.get_task(
+        task_id,
+        user_id=current_user["_id"],
+        is_admin=current_user.get("is_admin", False)
+    )
     if not task:
-        logger.warning(f"Task not found for streaming: {task_id}")
-        raise HTTPException(status_code=404, detail="Task not found")
+        exists = await service.get_task(task_id)
+        if not exists:
+            raise HTTPException(status_code=404, detail="Task not found")
+        else:
+            raise HTTPException(status_code=403, detail="Not authorized to view this task")
 
     logger.info(f"Starting status stream for task {task_id}")
     return StreamingResponse(
-        _stream_wrapper(request, service, task_id),
+        _stream_wrapper(request, service, task_id, current_user["_id"], current_user.get("is_admin", False)),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
         }
     )
+

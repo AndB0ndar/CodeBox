@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Регистрация{% endblock %}
+{% block content %}
+<h1>Регистрация</h1>
+{% if error %}
+    <div class="error-message">{{ error }}</div>
+{% endif %}
+<form method="post" class="submit-form">
+    <div class="submit-form__group">
+        <label class="submit-form__label" for="username">Имя пользователя</label>
+        <input type="text" id="username" name="username" class="submit-form__input" required>
+    </div>
+    <div class="submit-form__group">
+        <label class="submit-form__label" for="email">Email</label>
+        <input type="email" id="email" name="email" class="submit-form__input" required>
+    </div>
+    <div class="submit-form__group">
+        <label class="submit-form__label" for="password">Пароль</label>
+        <input type="password" id="password" name="password" class="submit-form__input" required>
+    </div>
+    <button type="submit" class="button button--primary">Зарегистрироваться</button>
+    <p class="submit-form-footer">Уже есть аккаунт? <a href="{{ url_for('auth.login') }}" class="submit-form-link">Войти</a></p>
+</form>
+{% endblock %}

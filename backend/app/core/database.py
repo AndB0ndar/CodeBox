@@ -30,18 +30,20 @@ async def close_mongo_connection():
         mongodb.client.close()
         logger.info("Disconnected from MongoDB.")
 
-
 async def ensure_indexes():
     """
     Create necessary indexes for the tasks collection to optimize queries.
     Called automatically on startup.
     """
+    users_collection = mongodb.db.users
+
+    await mongodb.db.users.create_index("username", unique=True)
+    await mongodb.db.users.create_index("email", unique=True)
+
     tasks_collection = mongodb.db.tasks
 
     await tasks_collection.create_index("status", name="status_idx")
-
     await tasks_collection.create_index("created_at", name="created_at_idx")
-
     await tasks_collection.create_index(
         [("status", 1), ("created_at", -1)],
         name="status_created_at_idx"

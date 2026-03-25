@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Ошибка{% endblock %}
+{% block content %}
+<h1>Произошла ошибка</h1>
+<div class="error-message">{{ error_message }}</div>
+<a href="{{ url_for('site.index') }}" class="button button--primary">На главную</a>
+{% endblock %}

@@ -9,5 +9,9 @@ COPY ./app /app/app
 
 ENV FLASK_APP=app/main.py
 ENV FLASK_RUN_HOST=0.0.0.0
+ENV FLASK_ENV=production
 
-CMD ["flask", "run", "--port=5000"]
+ENV PORT=5000
+
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app.main:app"]
+

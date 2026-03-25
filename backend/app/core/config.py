@@ -16,7 +16,6 @@ class Settings(BaseSettings):
         extra='forbid'
     )
 
-
     # MongoDB
     MONGO_URI: str = Field(
         default="mongodb://localhost:27017",
@@ -88,6 +87,24 @@ class Settings(BaseSettings):
     )
     """List of allowed CORS origins."""
 
+    # Authorization
+    SECRET_KEY: str = Field(
+        default=os.getenv("SECRET_KEY", "your-secret-key-change-in-production"),
+        description="JWT signing secret key (override in production)"
+    )
+    """JWT signing secret key. Must be kept secret!"""
+
+    ALGORITHM: str = Field(
+        default="HS256",
+        description="JWT encryption algorithm"
+    )
+    """JWT signing algorithm."""
+
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(
+        default=30,
+        description="Access token expiration time in minutes"
+    )
+    """How many minutes an access token is valid."""
 
     # ---------- Validation ----------
     @field_validator("REDIS_URL")

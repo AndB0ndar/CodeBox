@@ -25,6 +25,12 @@
             <a href="{{ url_for('site.index') }}" class="header__logo">Task Runner</a>
             <nav class="header__nav">
                 <a href="{{ url_for('site.index') }}" class="header__link">Главная</a>
+                {% if session.access_token %}
+                    <a href="{{ url_for('auth.logout') }}" class="header__link">Выйти</a>
+                {% else %}
+                    <a href="{{ url_for('auth.login') }}" class="header__link">Войти</a>
+                    <a href="{{ url_for('auth.register') }}" class="header__link">Регистрация</a>
+                {% endif %}
             </nav>
         </div>
     </header>

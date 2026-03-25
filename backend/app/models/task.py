@@ -75,6 +75,10 @@ class TaskInDB(BaseModel):
         description="Unique task identifier"
     )
 
+    user_id: Optional[str] = Field(
+        None, description="Unique identifier of task owner"
+    )
+
     code: str = Field(..., description="Source code to execute")
     language: str = Field(..., description="Programming language")
 

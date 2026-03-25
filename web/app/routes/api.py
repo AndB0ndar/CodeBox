@@ -1,7 +1,9 @@
 import requests
 
-from flask import Blueprint, jsonify, Response, stream_with_context
+from flask import Blueprint, jsonify, Response, stream_with_context, session
 
+from app import limiter
+from app.core.auth import login_required
 from app.core.backend_client import BackendClient
 
 
@@ -14,16 +16,20 @@ def health():
 
 
 @api_bp.route('/tasks/<task_id>')
+@login_required
 def api_task(task_id):
-    task = BackendClient.get_task(task_id)
+    token = session.get('access_token')
+    task = BackendClient.get_task(token, task_id)
     if task is None:
         return jsonify({"error": "Task not found"}), 404
     return jsonify(task)
 
 
 @api_bp.route('/tasks/<task_id>/logs')
+@login_required
 def api_task_logs(task_id):
-    log_url = BackendClient.get_task_log(task_id)
+    token = session.get('access_token')
+    log_url = BackendClient.get_task_log(token, task_id)
     if log_url is None:
         return jsonify({"error": "Logs not found"}), 404
 
@@ -44,14 +50,18 @@ def api_task_logs(task_id):
 
 
 @api_bp.route('/tasks/<task_id>/metrics')
+@login_required
 def api_task_metrics(task_id):
-    metrics = BackendClient.get_task_metrics(task_id)
+    token = session.get('access_token')
+    metrics = BackendClient.get_task_metrics(token, task_id)
     if metrics is None:
         return jsonify({"error": "Metrics not found"}), 404
     return jsonify(metrics)
 
 
 @api_bp.route('/tasks/<task_id>/stream')
+@login_required
 def stream_task_status(task_id):
-    return BackendClient.get_task_stream(task_id)
+    token = session.get('access_token')
+    return BackendClient.get_task_stream(token, task_id)
 

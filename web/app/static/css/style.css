@@ -275,6 +275,38 @@ h2::after {
     min-width: 140px;
 }
 
+.submit-form-link {
+    color: var(--accent);
+    text-decoration: none;
+    transition: var(--transition);
+    font-weight: 500;
+}
+
+.submit-form-link:hover {
+    color: var(--accent-dark);
+    text-decoration: underline;
+}
+
+.submit-form-footer {
+    margin-top: 1.5rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.error-message {
+    background: rgba(239, 68, 68, 0.15);
+    border-left: 4px solid var(--error);
+    color: #fecaca;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-sm);
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+    backdrop-filter: blur(4px);
+}
+
+
+
 /* ========== BUTTON ========== */
 .button {
     display: inline-flex;
@@ -776,3 +808,4 @@ h2::after {
         width: fit-content;
     }
 }
+

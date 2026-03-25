@@ -2,6 +2,10 @@ import logging
 
 from contextlib import asynccontextmanager
 
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -61,8 +65,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-from app.api import tasks
+from app.api import tasks, auth
+app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["tasks"])
 
 

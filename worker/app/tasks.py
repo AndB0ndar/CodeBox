@@ -146,11 +146,17 @@ def run_task(task_id: str):
 
             # Secutity
             read_only=True,
+            tmpfs={"/tmp": "rw,noexec,nosuid,size=64m"},
             security_opt=["no-new-privileges:true"],
             cap_drop=["ALL"],
             cap_add=[],
             network_disabled=True,
-            tmpfs={"/tmp": "rw,noexec,nosuid,size=64m"}
+
+            # Other
+            ulimits=[
+                {"Name": "nofile", "Soft": 1024, "Hard": 1024},
+                {"Name": "nproc", "Soft": 50, "Hard": 50}
+            ],
         )
 
         stats_thread = threading.Thread(
